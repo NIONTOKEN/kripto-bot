@@ -31,6 +31,10 @@ class BinanceClient:
         self._price_precisions: Dict[str, int] = {}
         self._min_qtys: Dict[str, Decimal] = {}
         self._min_notionals: Dict[str, Decimal] = {}
+        # Rate limiter: maks 5 eş zamanlı istek, istekler arası min 150ms
+        self._rate_sem = asyncio.Semaphore(5)
+        self._last_request_time: float = 0.0
+        self._min_request_interval = 0.15  # saniye
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -78,21 +82,48 @@ class BinanceClient:
 
         last_exc: Exception = RuntimeError("Unknown")
         for attempt in range(retries):
-            try:
-                async with self._session.request(method, url, params=params) as resp:
-                    data = await resp.json(content_type=None)
-                    if resp.status == 200:
-                        return data
-                    code = data.get("code", resp.status)
-                    msg = data.get("msg", str(data))
-                    # -4046: margin type zaten set → ignore
-                    if code == -4046:
-                        return data
-                    raise RuntimeError(f"Binance {code}: {msg}")
-            except aiohttp.ClientError as exc:
-                last_exc = exc
-                if attempt < retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+            # Rate limiting: istekler arası minimum bekleme
+            async with self._rate_sem:
+                now = asyncio.get_event_loop().time()
+                elapsed = now - self._last_request_time
+                if elapsed < self._min_request_interval:
+                    await asyncio.sleep(self._min_request_interval - elapsed)
+                self._last_request_time = asyncio.get_event_loop().time()
+
+                try:
+                    async with self._session.request(method, url, params=params) as resp:
+                        data = await resp.json(content_type=None)
+
+                        # 429 veya -1003: IP ban → hemen dur, retry etme!
+                        if resp.status == 429 or (isinstance(data, dict) and data.get("code") == -1003):
+                            ban_msg = data.get("msg", "Rate limit aşıldı") if isinstance(data, dict) else "Rate limit"
+                            logger.critical(f"⛔ RATE LIMIT / IP BAN: {ban_msg}")
+                            raise RuntimeError(f"Binance -1003: {ban_msg}")
+
+                        if resp.status == 200:
+                            return data
+
+                        code = data.get("code", resp.status) if isinstance(data, dict) else resp.status
+                        msg = data.get("msg", str(data)) if isinstance(data, dict) else str(data)
+
+                        # -4046: margin type zaten set → ignore
+                        if code == -4046:
+                            return data
+
+                        # -2015: IP whitelist'te yok → retry etme
+                        if code == -2015:
+                            raise RuntimeError(f"Binance {code}: IP whitelist'e ekle! {msg}")
+
+                        raise RuntimeError(f"Binance {code}: {msg}")
+
+                except RuntimeError:
+                    raise  # RuntimeError direkt yükselt, retry etme
+                except aiohttp.ClientError as exc:
+                    last_exc = exc
+                    if attempt < retries - 1:
+                        wait = 2 ** attempt * 2
+                        logger.warning(f"İstek hatası (deneme {attempt+1}/{retries}): {exc}. {wait}s bekleniyor...")
+                        await asyncio.sleep(wait)
         raise last_exc
 
     # ── Exchange Info ─────────────────────────────────────────────────────────
