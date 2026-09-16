@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>⚡ NEXUS // Binance Futures Terminal</title>
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#07090e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2091/2091665.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#07090e',
+                            primary: '#6366f1',
+                            accent: '#00f2fe',
+                            success: '#10b981',
+                            danger: '#f43f5e',
+                            warning: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #07090e;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(0, 242, 254, 0.12) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+        .glass-panel {
+            background: rgba(13, 18, 30, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .glass-panel-hover:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.2);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.05); }
+        }
+        .live-dot {
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="glass-panel sticky top-0 z-50 border-b border-white/10 px-6 py-3.5">
+        <div class="max-w-[1600px] mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                    <i data-lucide="cpu" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">NEXUS AI</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1" id="envBadge">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping"></span>
+                            MAINNET
+                        </span>
+                    </div>
+                    <p class="text-[11px] font-mono text-slate-400 tracking-wide">QUANTUM ALGO-TRADING ENGINE</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/5 font-mono text-xs text-slate-400">
+                    <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span id="lastUpdate">Senkronize Ediliyor...</span>
+                </div>
+
+                <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-xs tracking-wide shadow-lg shadow-emerald-500/10" id="statusBadge">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 live-dot"></span>
+                    <span>CANLI PİYASA TARAMASI</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 space-y-6">
+
+        <!-- Top Stat Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Bakiye -->
+            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Cüzdan Bakiyesi</span>
+                    <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        <i data-lucide="wallet" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="balance">0.00</span>
+                    <span class="text-sm font-bold text-cyan-400">USDT</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5 font-mono">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    Binance USDⓈ-M Futures
+                </div>
+            </div>
+
+            <!-- Günlük PnL -->
+            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Bugünkü Net Kâr/Zarar</span>
+                    <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-3xl font-extrabold font-mono tracking-tight text-emerald-400" id="dailyPnl">+0.0000</span>
+                    <span class="text-sm font-bold text-emerald-400">USDT</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
+                    <span class="px-1.5 py-0.5 rounded bg-white/5 font-mono text-[11px]" id="winRate">Win Rate: %0.0</span>
+                    <span>• 24 Saatlik Realized</span>
+                </div>
+            </div>
+
+            <!-- Açık Pozisyonlar -->
+            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Aktif Pozisyonlar</span>
+                    <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="openPos">0</span>
+                    <span class="text-xs font-mono text-slate-400">/ 5 Maksimum Slot</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span>SL / TP Koruması Devrede</span>
+                </div>
+            </div>
+
+            <!-- Taranan Pariteler -->
+            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">AI Radarı & Hacim</span>
+                    <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        <i data-lucide="radar" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="symbols">20</span>
+                    <span class="text-xs font-bold text-purple-400">LİKİT PARİTE</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5 font-mono">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+                    15 Dakikalık Kline Akışı
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Middle Section: TradingView Widget & AI Signal Engine -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="lg:col-span-2 glass-panel rounded-2xl p-5 flex flex-col h-[480px]">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="candlestick-chart" class="w-5 h-5 text-indigo-400"></i>
+                        <h2 class="font-bold text-sm tracking-wide text-white uppercase">Binance Futures Canlı Grafik</h2>
+                    </div>
+                    <span class="text-xs font-mono px-2.5 py-1 rounded-lg bg-white/5 text-slate-300 border border-white/10">BTCUSDT.P • 15m</span>
+                </div>
+                <div class="flex-1 rounded-xl overflow-hidden border border-white/5 bg-slate-950/60" id="tradingview_widget">
+                    <iframe 
+                        src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=BINANCE%3ABTCUSDT.P&interval=15&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Europe%2FIstanbul&withdateranges=1&studies_overrides=%7B%7D&overrides=%7B%22mainSeriesProperties.candleStyle.upColor%22%3A%22%2310b981%22%2C%22mainSeriesProperties.candleStyle.downColor%22%3A%22%23f43f5e%22%2C%22mainSeriesProperties.candleStyle.drawWick%22%3Atrue%2C%22mainSeriesProperties.candleStyle.drawBorder%22%3Atrue%2C%22mainSeriesProperties.candleStyle.borderUpColor%22%3A%22%2310b981%22%2C%22mainSeriesProperties.candleStyle.borderDownColor%22%3A%22%23f43f5e%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=tr"
+                        class="w-full h-full border-0">
+                    </iframe>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-2xl p-5 flex flex-col h-[480px]">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-cyan-400"></i>
+                        <h2 class="font-bold text-sm tracking-wide text-white uppercase">AI Sinyal Motoru</h2>
+                    </div>
+                    <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">AKTİF</span>
+                </div>
+
+                <div class="space-y-4 flex-1 overflow-y-auto pr-1">
+                    <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2.5 text-xs">
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="text-slate-400">Trend Göstergesi</span>
+                            <span class="font-mono font-bold text-cyan-400">EMA 9 / 21 / 50 / 200</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="text-slate-400">Momentum & Güç</span>
+                            <span class="font-mono font-bold text-indigo-400">RSI (14) + ADX + MACD</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="text-slate-400">Volatilite Filtresi</span>
+                            <span class="font-mono font-bold text-amber-400">Bollinger %B + ATR</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="text-slate-400">ML Tahmin Modeli</span>
+                            <span class="font-mono font-bold text-purple-400">Random Forest (Scikit)</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/15 space-y-2">
+                        <div class="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                            Aktif Güvenlik Kalkanları
+                        </div>
+                        <ul class="text-[11px] text-slate-400 space-y-1.5">
+                            <li class="flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span><b>Zarar Durdur (SL):</b> Her emirde ATR × 1.5 mesafede</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span><b>Kâr Al (TP):</b> Dinamik ATR × 3.0 hedefi</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span><b>Anti-Martingale:</b> Asla kaybeden pozisyona ekleme yapmaz</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span><b>Tek Pozisyon:</b> Aynı paritede asla çift işlem açmaz</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2.5">
+                        <i data-lucide="info" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                        <p class="leading-relaxed">
+                            Vadeli İşlemler cüzdanına en az <b>1 USDT</b> transfer edildiği anda bot en güçlü sinyal üreten coin'de otomatik işlem açacaktır.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Tables Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- Açık Pozisyonlar Tablosu -->
+            <div class="glass-panel rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="crosshair" class="w-5 h-5 text-cyan-400"></i>
+                        <h3 class="font-bold text-sm tracking-wide text-white uppercase">Açık Vadeli Pozisyonlar</h3>
+                    </div>
+                    <span class="text-xs text-slate-400 font-mono" id="posCountText">0 Aktif</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400">
+                                <th class="pb-3 font-semibold">PARİTE</th>
+                                <th class="pb-3 font-semibold">YÖN</th>
+                                <th class="pb-3 font-semibold">GİRİŞ</th>
+                                <th class="pb-3 font-semibold text-rose-400">STOP LOSS</th>
+                                <th class="pb-3 font-semibold text-emerald-400">TAKE PROFIT</th>
+                                <th class="pb-3 font-semibold">AI SKOR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable" class="divide-y divide-white/5">
+                            <tr>
+                                <td colspan="6" class="py-10 text-center text-slate-500 italic">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <i data-lucide="inbox" class="w-8 h-8 stroke-1 text-slate-600"></i>
+                                        <span>Şu an açık pozisyon bulunmuyor</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Son Kapanan İşlemler Tablosu -->
+            <div class="glass-panel rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="history" class="w-5 h-5 text-indigo-400"></i>
+                        <h3 class="font-bold text-sm tracking-wide text-white uppercase">Son Kapanan İşlemler</h3>
+                    </div>
+                    <span class="text-xs text-slate-400 font-mono">Realized PnL Geçmişi</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400">
+                                <th class="pb-3 font-semibold">PARİTE</th>
+                                <th class="pb-3 font-semibold">YÖN</th>
+                                <th class="pb-3 font-semibold">NET KÂR/ZARAR</th>
+                                <th class="pb-3 font-semibold">ÇIKIŞ NEDENİ</th>
+                                <th class="pb-3 font-semibold">ZAMAN</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradesTable" class="divide-y divide-white/5">
+                            <tr>
+                                <td colspan="5" class="py-10 text-center text-slate-500 italic">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <i data-lucide="clock" class="w-8 h-8 stroke-1 text-slate-600"></i>
+                                        <span>Henüz kapanmış işlem kaydı yok</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="border-t border-white/5 py-4 px-6 text-center text-xs text-slate-500 font-mono mt-auto">
+        NEXUS AI FUTURES BOT // BINANCE USDⓈ-M PROTOCOL // 24/7 AUTONOMOUS EXECUTION
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const WS_URL = `ws://${location.host}/ws`;
+        let ws = null;
+        let reconnectDelay = 2000;
+
+        function fmt(n, d=4) {
+            if (n === null || n === undefined || n === 'None') return '—';
+            const v = parseFloat(n);
+            return isNaN(v) ? '—' : v.toFixed(d);
+        }
+
+        function fmtPnl(n) {
+            if (n === null || n === undefined || n === 'None') return '—';
+            const v = parseFloat(n);
+            if (isNaN(v)) return '—';
+            const isPos = v >= 0;
+            const cls = isPos ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+            const sign = isPos ? '+' : '';
+            return `<span class="${cls}">${sign}${v.toFixed(4)} USDT</span>`;
+        }
+
+        function fmtDate(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso + 'Z');
+            return d.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        }
+
+        async function fetchStatus() {
+            try {
+                const r = await fetch('/api/status');
+                const d = await r.json();
+                updateStatusCards(d);
+            } catch(e) {}
+        }
+
+        async function fetchPositions() {
+            try {
+                const r = await fetch('/api/positions');
+                const data = await r.json();
+                renderPositions(data);
+            } catch(e) {}
+        }
+
+        async function fetchTrades() {
+            try {
+                const r = await fetch('/api/trades?limit=15');
+                const data = await r.json();
+                renderTrades(data);
+            } catch(e) {}
+        }
+
+        function updateStatusCards(d) {
+            const bal = d.balance_usdt ? parseFloat(d.balance_usdt) : 0;
+            let balDisplay = '0.00';
+            if (bal > 0 && bal < 0.01) {
+                balDisplay = bal.toFixed(6);
+            } else {
+                balDisplay = bal.toFixed(2);
+            }
+            document.getElementById('balance').textContent = balDisplay;
+            
+            const pnl = parseFloat(d.daily_pnl || 0);
+            const pnlEl = document.getElementById('dailyPnl');
+            pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(4);
+            pnlEl.className = 'text-3xl font-extrabold font-mono tracking-tight ' + (pnl >= 0 ? 'text-emerald-400' : 'text-rose-400');
+            
+            document.getElementById('openPos').textContent = d.open_positions ?? 0;
+            document.getElementById('posCountText').textContent = `${d.open_positions ?? 0} Aktif`;
+            document.getElementById('symbols').textContent = d.symbols_tracked > 0 ? d.symbols_tracked : 20;
+
+            document.getElementById('lastUpdate').textContent = 'Son: ' + new Date().toLocaleTimeString('tr-TR');
+        }
+
+        function renderPositions(data) {
+            const tbody = document.getElementById('positionsTable');
+            if (!data.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-10 text-center text-slate-500 italic">
+                            <div class="flex flex-col items-center gap-2">
+                                <i data-lucide="inbox" class="w-8 h-8 stroke-1 text-slate-600"></i>
+                                <span>Şu an açık pozisyon bulunmuyor</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            tbody.innerHTML = data.map(t => {
+                const isLong = t.side === 'LONG';
+                const sideBadge = isLong
+                    ? '<span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">LONG</span>'
+                    : '<span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold">SHORT</span>';
+                
+                return `
+                    <tr class="hover:bg-white/[0.02] transition-colors">
+                        <td class="py-3 font-bold text-white flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full ${isLong ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
+                            ${t.symbol}
+                        </td>
+                        <td class="py-3">${sideBadge}</td>
+                        <td class="py-3 text-slate-200 font-mono">${fmt(t.entry_price)}</td>
+                        <td class="py-3 text-rose-400 font-mono">${fmt(t.sl_price)}</td>
+                        <td class="py-3 text-emerald-400 font-mono">${fmt(t.tp_price)}</td>
+                        <td class="py-3 font-mono font-bold text-indigo-400">${t.signal_score ? t.signal_score.toFixed(1) : '—'}</td>
+                    </tr>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function renderTrades(data) {
+            const tbody = document.getElementById('tradesTable');
+            const closed = data.filter(t => t.status === 'CLOSED');
+            if (!closed.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="py-10 text-center text-slate-500 italic">
+                            <div class="flex flex-col items-center gap-2">
+                                <i data-lucide="clock" class="w-8 h-8 stroke-1 text-slate-600"></i>
+                                <span>Henüz kapanmış işlem kaydı yok</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            tbody.innerHTML = closed.map(t => {
+                const isLong = t.side === 'LONG';
+                const sideBadge = isLong
+                    ? '<span class="text-emerald-400 font-semibold">LONG</span>'
+                    : '<span class="text-rose-400 font-semibold">SHORT</span>';
+
+                let reasonBadge = `<span class="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[10px]">${t.close_reason || 'MANUAL'}</span>`;
+                if (t.close_reason === 'TP') {
+                    reasonBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">KÂR AL (TP)</span>`;
+                } else if (t.close_reason === 'SL') {
+                    reasonBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">STOP (SL)</span>`;
+                }
+
+                return `
+                    <tr class="hover:bg-white/[0.02] transition-colors">
+                        <td class="py-3 font-bold text-white">${t.symbol}</td>
+                        <td class="py-3">${sideBadge}</td>
+                        <td class="py-3 font-mono">${fmtPnl(t.pnl)}</td>
+                        <td class="py-3">${reasonBadge}</td>
+                        <td class="py-3 text-slate-400 font-mono text-[11px]">${fmtDate(t.closed_at)}</td>
+                    </tr>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function connectWs() {
+            try {
+                ws = new WebSocket(WS_URL);
+                ws.onopen = () => {
+                    reconnectDelay = 2000;
+                    fetchStatus(); fetchPositions(); fetchTrades();
+                };
+                ws.onmessage = (e) => {
+                    try {
+                        const msg = JSON.parse(e.data);
+                        if (msg.type === 'status') updateStatusCards(msg.data);
+                        if (msg.type === 'position_update') fetchPositions();
+                        if (msg.type === 'trade_closed') { fetchTrades(); fetchStatus(); }
+                    } catch(_) {}
+                };
+                ws.onclose = () => {
+                    setTimeout(connectWs, reconnectDelay);
+                    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+                };
+                ws.onerror = () => ws.close();
+            } catch(e) {
+                setTimeout(connectWs, reconnectDelay);
+            }
+        }
+
+        setInterval(() => { fetchStatus(); fetchPositions(); fetchTrades(); }, 15000);
+        connectWs();
+    </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# API Keys ve gizli bilgiler - ASLA GitHub'a yükleme!
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Database (lokal veri)
+*.db
+*.sqlite3
+trading_bot.db
+
+# Logs
+*.log
+logs/
+
+# OS dosyalarý
+.DS_Store
+Thumbs.db
+
+# IDE dosyalarý
+.vscode/
+.idea/
+*.swp
