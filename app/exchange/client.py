@@ -35,6 +35,7 @@ class BinanceClient:
         self._rate_sem = asyncio.Semaphore(5)
         self._last_request_time: float = 0.0
         self._min_request_interval = 0.15  # saniye
+        self._time_offset_ms: int = 0      # Binance sunucu saat farkı
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -43,7 +44,22 @@ class BinanceClient:
             headers={"X-MBX-APIKEY": config.BINANCE_API_KEY},
             timeout=aiohttp.ClientTimeout(total=30),
         )
+        await self._sync_server_time()
         await self._load_exchange_info()
+
+    async def _sync_server_time(self) -> None:
+        """Binance sunucu saati ile yerel saat arasındaki farkı hesapla."""
+        try:
+            url = f"{config.REST_BASE}/fapi/v1/time"
+            async with self._session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    server_time = int(data.get("serverTime", 0))
+                    local_time = int(time.time() * 1000)
+                    self._time_offset_ms = server_time - local_time
+                    logger.info(f"Binance sunucu zaman farkı senkronize edildi: {self._time_offset_ms} ms")
+        except Exception as exc:
+            logger.warning(f"Zaman senkronizasyon hatası: {exc}")
 
     async def stop(self) -> None:
         if self._session and not self._session.closed:
@@ -52,7 +68,11 @@ class BinanceClient:
     # ── İmzalama ─────────────────────────────────────────────────────────────
 
     def _sign(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        params["timestamp"] = int(time.time() * 1000)
+        # Sunucu zaman farkını ekle ve geniş recvWindow kullan
+        synced_ts = int(time.time() * 1000) + self._time_offset_ms
+        params["timestamp"] = synced_ts
+        if "recvWindow" not in params:
+            params["recvWindow"] = 60000
         query_string = urlencode(sorted(params.items()))
         sig = hmac.new(
             config.BINANCE_SECRET_KEY.encode("utf-8"),
