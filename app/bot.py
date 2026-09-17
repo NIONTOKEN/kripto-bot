@@ -398,10 +398,20 @@ class TradingBot:
         pos_sync_counter = 0
         status_counter = 0
 
+        time_sync_counter = 0
         while self._running:
             await asyncio.sleep(10)
             pos_sync_counter += 10
             status_counter += 10
+            time_sync_counter += 10
+
+            # ── Periyodik Binance Saat Senkronizasyonu (180sn) ────────────────
+            if time_sync_counter >= 180:
+                time_sync_counter = 0
+                try:
+                    await self.client._sync_server_time()
+                except Exception:
+                    pass
 
             # ── Pozisyon senkronizasyonu ──────────────────────────────────────
             if pos_sync_counter >= pos_sync_interval:

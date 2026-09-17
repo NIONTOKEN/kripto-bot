@@ -72,7 +72,7 @@ class BinanceClient:
         synced_ts = int(time.time() * 1000) + self._time_offset_ms
         params["timestamp"] = synced_ts
         if "recvWindow" not in params:
-            params["recvWindow"] = 10000
+            params["recvWindow"] = 60000
         query_string = urlencode(sorted(params.items()))
         sig = hmac.new(
             config.BINANCE_SECRET_KEY.encode("utf-8"),
@@ -97,14 +97,14 @@ class BinanceClient:
         req_params = None
         if params is None:
             params = {}
-        if signed:
-            qs_with_sig = self._sign(dict(params))
-            url = f"{url}?{qs_with_sig}"
-        elif params:
-            req_params = params
-
         last_exc: Exception = RuntimeError("Unknown")
         for attempt in range(retries):
+            # İmzalı isteklerde her denemede taze timestamp üret
+            actual_url = url
+            if signed:
+                qs_with_sig = self._sign(dict(params))
+                actual_url = f"{url}?{qs_with_sig}"
+
             # Rate limiting: istekler arası minimum bekleme
             async with self._rate_sem:
                 now = asyncio.get_event_loop().time()
@@ -114,7 +114,7 @@ class BinanceClient:
                 self._last_request_time = asyncio.get_event_loop().time()
 
                 try:
-                    async with self._session.request(method, url, params=req_params) as resp:
+                    async with self._session.request(method, actual_url, params=req_params) as resp:
                         data = await resp.json(content_type=None)
 
                         # 429 veya -1003: IP ban → hemen dur, retry etme!
@@ -133,6 +133,13 @@ class BinanceClient:
                         if code == -4046:
                             return data
 
+                        # -1021: Timestamp / recvWindow hatası → saati yeniden eşitle ve tekrar dene!
+                        if code == -1021:
+                            logger.warning("Binance -1021 zaman farkı algılandı, sunucu saati yeniden senkronize ediliyor...")
+                            await self._sync_server_time()
+                            await asyncio.sleep(0.5)
+                            continue
+
                         # -2015: IP whitelist'te yok → retry etme
                         if code == -2015:
                             raise RuntimeError(f"Binance {code}: IP whitelist'e ekle! {msg}")
@@ -140,9 +147,14 @@ class BinanceClient:
                         raise RuntimeError(f"Binance {code}: {msg}")
 
                 except RuntimeError:
-                    raise  # RuntimeError direkt yükselt, retry etme
+                    raise  # RuntimeError direkt yükselt
                 except aiohttp.ClientError as exc:
                     last_exc = exc
+                    if attempt < retries - 1:
+                        wait = 2 ** attempt * 2
+                        logger.warning(f"İstek hatası (deneme {attempt+1}/{retries}): {exc}. {wait}s bekleniyor...")
+                        await asyncio.sleep(wait)
+        raise last_exc
                     if attempt < retries - 1:
                         wait = 2 ** attempt * 2
                         logger.warning(f"İstek hatası (deneme {attempt+1}/{retries}): {exc}. {wait}s bekleniyor...")
