@@ -155,11 +155,6 @@ class BinanceClient:
                         logger.warning(f"İstek hatası (deneme {attempt+1}/{retries}): {exc}. {wait}s bekleniyor...")
                         await asyncio.sleep(wait)
         raise last_exc
-                    if attempt < retries - 1:
-                        wait = 2 ** attempt * 2
-                        logger.warning(f"İstek hatası (deneme {attempt+1}/{retries}): {exc}. {wait}s bekleniyor...")
-                        await asyncio.sleep(wait)
-        raise last_exc
 
     # ── Exchange Info ─────────────────────────────────────────────────────────
 
