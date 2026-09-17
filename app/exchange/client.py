@@ -67,20 +67,19 @@ class BinanceClient:
 
     # ── İmzalama ─────────────────────────────────────────────────────────────
 
-    def _sign(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _sign(self, params: Dict[str, Any]) -> str:
         # Sunucu zaman farkını ekle ve geniş recvWindow kullan
         synced_ts = int(time.time() * 1000) + self._time_offset_ms
         params["timestamp"] = synced_ts
         if "recvWindow" not in params:
-            params["recvWindow"] = 60000
+            params["recvWindow"] = 10000
         query_string = urlencode(sorted(params.items()))
         sig = hmac.new(
             config.BINANCE_SECRET_KEY.encode("utf-8"),
             query_string.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
-        params["signature"] = sig
-        return params
+        return f"{query_string}&signature={sig}"
 
     # ── İstek ────────────────────────────────────────────────────────────────
 
@@ -95,10 +94,14 @@ class BinanceClient:
         if self._session is None:
             raise RuntimeError("BinanceClient.start() çağrılmadı")
         url = f"{config.REST_BASE}{path}"
+        req_params = None
         if params is None:
             params = {}
         if signed:
-            params = self._sign(dict(params))
+            qs_with_sig = self._sign(dict(params))
+            url = f"{url}?{qs_with_sig}"
+        elif params:
+            req_params = params
 
         last_exc: Exception = RuntimeError("Unknown")
         for attempt in range(retries):
@@ -111,7 +114,7 @@ class BinanceClient:
                 self._last_request_time = asyncio.get_event_loop().time()
 
                 try:
-                    async with self._session.request(method, url, params=params) as resp:
+                    async with self._session.request(method, url, params=req_params) as resp:
                         data = await resp.json(content_type=None)
 
                         # 429 veya -1003: IP ban → hemen dur, retry etme!
