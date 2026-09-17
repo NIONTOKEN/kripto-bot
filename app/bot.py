@@ -131,6 +131,7 @@ class TradingBot:
             balance=float(balance),
             open_positions=len(await get_open_trades()),
             symbols_tracked=len(self._symbols),
+            symbols_list=self._symbols,
             testnet=config.BINANCE_TESTNET,
             uptime_start=datetime.utcnow().isoformat(),
         )

@@ -23,8 +23,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 
 from app.database import (
+    Signal,
     Trade,
     get_open_trades,
+    get_recent_signals,
     get_recent_trades,
     get_todays_closed_pnl,
 )
@@ -43,6 +45,12 @@ _bot_state: Dict[str, Any] = {
     "balance": 0.0,
     "open_positions": 0,
     "symbols_tracked": 0,
+    "symbols_list": [
+        "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+        "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "SUIUSDT",
+        "NEARUSDT", "APTUSDT", "PEPEUSDT", "SHIBUSDT", "DOTUSDT",
+        "LTCUSDT", "ARBUSDT", "OPUSDT", "INJUSDT", "FETUSDT"
+    ],
     "uptime_start": datetime.utcnow().isoformat(),
     "testnet": True,
     "daily_pnl": 0.0,
@@ -157,6 +165,34 @@ async def get_stats() -> dict:
         "win_rate_pct": round(win_rate, 1),
         "balance": _bot_state["balance"],
     }
+
+
+@app.get("/api/symbols")
+async def get_symbols() -> List[str]:
+    """Takip edilen veya taranan sembollerin listesini döner."""
+    return _bot_state.get("symbols_list", [])
+
+
+@app.get("/api/signals")
+async def get_signals(limit: int = 30) -> List[dict]:
+    """Son üretilen AI sinyal analizlerini döner."""
+    signals = await get_recent_signals(limit=limit)
+    return [
+        {
+            "id": s.id,
+            "symbol": s.symbol,
+            "timestamp": s.timestamp.isoformat() if s.timestamp else None,
+            "direction": s.direction,
+            "score": s.score,
+            "ml_confidence": s.ml_confidence,
+            "regime": s.regime,
+            "rsi": s.rsi,
+            "macd_hist": s.macd_hist,
+            "adx": s.adx,
+            "atr": s.atr,
+        }
+        for s in signals
+    ]
 
 
 @app.websocket("/ws")

@@ -175,12 +175,15 @@
                 </div>
             </div>
 
-            <!-- Taranan Pariteler -->
-            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
+            <!-- Taranan Pariteler (Tıklanabilir AI Radarı) -->
+            <div onclick="openRadarModal()" class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group cursor-pointer border border-purple-500/20 hover:border-purple-400/50">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/30 transition-all"></div>
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">AI Radarı & Hacim</span>
-                    <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <span>AI Radarı & Hacim</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300">Tıkla Gör</span>
+                    </span>
+                    <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 group-hover:scale-110 transition-transform">
                         <i data-lucide="radar" class="w-4 h-4"></i>
                     </div>
                 </div>
@@ -188,9 +191,9 @@
                     <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="symbols">20</span>
                     <span class="text-xs font-bold text-purple-400">LİKİT PARİTE</span>
                 </div>
-                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5 font-mono">
-                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
-                    15 Dakikalık Kline Akışı
+                <div class="mt-2 text-xs text-purple-300 flex items-center gap-1.5 font-mono">
+                    <i data-lucide="eye" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span>Tüm Sinyalleri & Pariteleri İncele ➔</span>
                 </div>
             </div>
 
@@ -199,16 +202,37 @@
         <!-- Middle Section: TradingView Widget & AI Signal Engine -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <div class="lg:col-span-2 glass-panel rounded-2xl p-5 flex flex-col h-[480px]">
-                <div class="flex items-center justify-between mb-4">
+            <div class="lg:col-span-2 glass-panel rounded-2xl p-5 flex flex-col h-[520px]">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div class="flex items-center gap-2">
                         <i data-lucide="candlestick-chart" class="w-5 h-5 text-indigo-400"></i>
                         <h2 class="font-bold text-sm tracking-wide text-white uppercase">Binance Futures Canlı Grafik</h2>
                     </div>
-                    <span class="text-xs font-mono px-2.5 py-1 rounded-lg bg-white/5 text-slate-300 border border-white/10">BTCUSDT.P • 15m</span>
+                    
+                    <!-- Coin Seçici Dropdown -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400 font-mono hidden sm:inline">Parite Seç:</span>
+                        <select id="symbolSelector" onchange="changeChartSymbol(this.value)" class="bg-slate-900/90 text-cyan-300 font-mono text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 focus:outline-none focus:border-cyan-400 cursor-pointer">
+                            <option value="BTCUSDT" selected>BTCUSDT (Bitcoin)</option>
+                            <option value="ETHUSDT">ETHUSDT (Ethereum)</option>
+                            <option value="SOLUSDT">SOLUSDT (Solana)</option>
+                            <option value="BNBUSDT">BNBUSDT (BNB)</option>
+                            <option value="XRPUSDT">XRPUSDT (Ripple)</option>
+                            <option value="DOGEUSDT">DOGEUSDT (Dogecoin)</option>
+                            <option value="ADAUSDT">ADAUSDT (Cardano)</option>
+                            <option value="AVAXUSDT">AVAXUSDT (Avalanche)</option>
+                            <option value="SUIUSDT">SUIUSDT (Sui)</option>
+                            <option value="NEARUSDT">NEARUSDT (Near)</option>
+                            <option value="PEPEUSDT">PEPEUSDT (Pepe)</option>
+                            <option value="SHIBUSDT">SHIBUSDT (Shiba)</option>
+                            <option value="LINKUSDT">LINKUSDT (Chainlink)</option>
+                        </select>
+                        <span class="text-xs font-mono px-2 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" id="currentChartLabel">15m</span>
+                    </div>
                 </div>
-                <div class="flex-1 rounded-xl overflow-hidden border border-white/5 bg-slate-950/60" id="tradingview_widget">
+                <div class="flex-1 rounded-xl overflow-hidden border border-white/5 bg-slate-950/60" id="tradingview_container">
                     <iframe 
+                        id="tradingview_iframe"
                         src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=BINANCE%3ABTCUSDT.P&interval=15&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Europe%2FIstanbul&withdateranges=1&studies_overrides=%7B%7D&overrides=%7B%22mainSeriesProperties.candleStyle.upColor%22%3A%22%2310b981%22%2C%22mainSeriesProperties.candleStyle.downColor%22%3A%22%23f43f5e%22%2C%22mainSeriesProperties.candleStyle.drawWick%22%3Atrue%2C%22mainSeriesProperties.candleStyle.drawBorder%22%3Atrue%2C%22mainSeriesProperties.candleStyle.borderUpColor%22%3A%22%2310b981%22%2C%22mainSeriesProperties.candleStyle.borderDownColor%22%3A%22%23f43f5e%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=tr"
                         class="w-full h-full border-0">
                     </iframe>
@@ -356,6 +380,69 @@
 
         </div>
 
+        <!-- AI Radarı & 20 Parite Modalı -->
+        <div id="radarModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+            <div class="glass-panel w-full max-w-4xl max-h-[85vh] rounded-2xl border border-purple-500/30 flex flex-col shadow-2xl shadow-purple-500/10 overflow-hidden">
+                <div class="p-5 border-b border-white/10 flex items-center justify-between bg-purple-950/20">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="radar" class="w-5 h-5 text-purple-400"></i>
+                        <h3 class="font-bold text-base text-white tracking-wide">AI RADARI — TAKİP EDİLEN 20 LİKİT PARİTE</h3>
+                    </div>
+                    <button onclick="closeRadarModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="p-5 overflow-y-auto space-y-4">
+                    <p class="text-xs text-slate-300">
+                        Bot 24 saatlik hacmi en yüksek 20 pariteyi sürekli tarar, EMA, RSI, MACD ve Random Forest ML modeli ile her mumda 0-100 arası AI skoru üretir.
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead>
+                                <tr class="border-b border-white/10 text-slate-400">
+                                    <th class="pb-2">PARİTE</th>
+                                    <th class="pb-2">İŞLEM GRAFİĞİ</th>
+                                    <th class="pb-2">SON SİNYAL</th>
+                                    <th class="pb-2">AI SKOR</th>
+                                    <th class="pb-2">RSI (14)</th>
+                                    <th class="pb-2">PİYASA REJİMİ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="radarTableBody" class="divide-y divide-white/5">
+                                <tr>
+                                    <td colspan="6" class="py-6 text-center text-slate-500 italic">Veriler yükleniyor...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pozisyon Detay Modalı -->
+        <div id="positionModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+            <div class="glass-panel w-full max-w-lg rounded-2xl border border-cyan-500/30 flex flex-col shadow-2xl shadow-cyan-500/10 overflow-hidden">
+                <div class="p-5 border-b border-white/10 flex items-center justify-between bg-cyan-950/20">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="crosshair" class="w-5 h-5 text-cyan-400"></i>
+                        <h3 class="font-bold text-base text-white tracking-wide" id="modalPosTitle">POZİSYON DETAYI</h3>
+                    </div>
+                    <button onclick="closePositionModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-4 font-mono text-xs" id="modalPosBody">
+                    <!-- Dinamik doldurulacak -->
+                </div>
+                <div class="p-4 bg-white/[0.02] border-t border-white/10 flex justify-end gap-2">
+                    <button id="modalViewChartBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors">
+                        <i data-lucide="candlestick-chart" class="w-4 h-4"></i>
+                        Canlı Grafikte Aç
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <footer class="border-t border-white/5 py-4 px-6 text-center text-xs text-slate-500 font-mono mt-auto">
@@ -368,6 +455,7 @@
         const WS_URL = `ws://${location.host}/ws`;
         let ws = null;
         let reconnectDelay = 2000;
+        let currentPositionsData = [];
 
         function fmt(n, d=4) {
             if (n === null || n === undefined || n === 'None') return '—';
@@ -391,6 +479,163 @@
             return d.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
         }
 
+        // ── Canlı Grafik Değiştirici ──────────────────────────────────────
+        function changeChartSymbol(symbol) {
+            if (!symbol) return;
+            const cleanSym = symbol.toUpperCase().replace('.P', '');
+            const iframe = document.getElementById('tradingview_iframe');
+            if (iframe) {
+                iframe.src = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=BINANCE%3A${cleanSym}.P&interval=15&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Europe%2FIstanbul&withdateranges=1&studies_overrides=%7B%7D&overrides=%7B%22mainSeriesProperties.candleStyle.upColor%22%3A%22%2310b981%22%2C%22mainSeriesProperties.candleStyle.downColor%22%3A%22%23f43f5e%22%2C%22mainSeriesProperties.candleStyle.drawWick%22%3Atrue%2C%22mainSeriesProperties.candleStyle.drawBorder%22%3Atrue%2C%22mainSeriesProperties.candleStyle.borderUpColor%22%3A%22%2310b981%22%2C%22mainSeriesProperties.candleStyle.borderDownColor%22%3A%22%23f43f5e%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=tr`;
+            }
+            const selector = document.getElementById('symbolSelector');
+            if (selector) selector.value = cleanSym;
+        }
+
+        // ── Pozisyon Detay Modalı ─────────────────────────────────────────
+        function openPositionDetail(idx) {
+            const t = currentPositionsData[idx];
+            if (!t) return;
+
+            const isLong = t.side === 'LONG';
+            document.getElementById('modalPosTitle').textContent = `${t.symbol} — ${t.side} (${t.leverage || 6}x Kaldıraç)`;
+            
+            const entry = parseFloat(t.entry_price || 0);
+            const sl = parseFloat(t.sl_price || 0);
+            const tp = parseFloat(t.tp_price || 0);
+            const qty = t.quantity || '0';
+
+            const slDistance = entry > 0 && sl > 0 ? (Math.abs(entry - sl) / entry * 100).toFixed(2) : '—';
+            const tpDistance = entry > 0 && tp > 0 ? (Math.abs(tp - entry) / entry * 100).toFixed(2) : '—';
+
+            document.getElementById('modalPosBody').innerHTML = `
+                <div class="grid grid-cols-2 gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Pozisyon Yönü</span>
+                        <span class="font-bold text-sm ${isLong ? 'text-emerald-400' : 'text-rose-400'}">${t.side}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">İşlem Miktarı</span>
+                        <span class="text-white font-bold text-sm">${qty}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Giriş Fiyatı</span>
+                        <span class="text-slate-200 font-bold text-sm">${fmt(entry)}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">AI Sinyal Skoru</span>
+                        <span class="text-indigo-400 font-bold text-sm">${t.signal_score ? t.signal_score.toFixed(1) + '/100' : '—'}</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2 p-3 rounded-xl bg-rose-500/5 border border-rose-500/20">
+                    <div class="flex justify-between items-center">
+                        <span class="text-rose-400 font-bold">Zarar Durdur (Stop Loss):</span>
+                        <span class="text-rose-300 font-bold">${fmt(sl)} (%${slDistance})</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Trailing Stop devredeyse kâr arttıkça SL otomatik olarak yükseltilir.</p>
+                </div>
+
+                <div class="space-y-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                    <div class="flex justify-between items-center">
+                        <span class="text-emerald-400 font-bold">Kâr Al (Take Profit):</span>
+                        <span class="text-emerald-300 font-bold">${fmt(tp)} (%${tpDistance})</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Hedef fiyata ulaşıldığında Binance emri kârla otomatik kapatır.</p>
+                </div>
+
+                <div class="text-[11px] text-slate-400 flex justify-between pt-1">
+                    <span>İşlem Açılış Zamanı:</span>
+                    <span class="text-slate-200">${fmtDate(t.opened_at)}</span>
+                </div>
+            `;
+
+            const chartBtn = document.getElementById('modalViewChartBtn');
+            chartBtn.onclick = () => {
+                changeChartSymbol(t.symbol);
+                closePositionModal();
+                window.scrollTo({ top: 350, behavior: 'smooth' });
+            };
+
+            const modal = document.getElementById('positionModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closePositionModal() {
+            const modal = document.getElementById('positionModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ── AI Radarı & 20 Parite Modalı ──────────────────────────────────
+        async function openRadarModal() {
+            const modal = document.getElementById('radarModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+
+            const tbody = document.getElementById('radarTableBody');
+            tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400 italic">20 Likit parite ve sinyal durumu yükleniyor...</td></tr>`;
+
+            try {
+                const [symRes, sigRes] = await Promise.all([
+                    fetch('/api/symbols'),
+                    fetch('/api/signals?limit=40')
+                ]);
+                const symbols = await symRes.json();
+                const signals = await sigRes.json();
+
+                // Sembol başına son sinyali haritala
+                const sigMap = {};
+                signals.forEach(s => {
+                    if (!sigMap[s.symbol]) sigMap[s.symbol] = s;
+                });
+
+                if (!symbols.length) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-500">Henüz sembol listesi alınamadı.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = symbols.map(sym => {
+                    const sig = sigMap[sym];
+                    const dir = sig ? sig.direction : 'TARANIYOR';
+                    const score = sig ? `${sig.score.toFixed(1)}/100` : '—';
+                    const rsi = sig && sig.rsi ? sig.rsi.toFixed(1) : '—';
+                    const regime = sig && sig.regime ? sig.regime : '—';
+
+                    let dirBadge = `<span class="px-2 py-0.5 rounded bg-white/5 text-slate-400">NÖTR</span>`;
+                    if (dir === 'LONG') dirBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">🟢 LONG</span>`;
+                    else if (dir === 'SHORT') dirBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold">🔴 SHORT</span>`;
+
+                    return `
+                        <tr class="hover:bg-white/[0.04] transition-colors">
+                            <td class="py-3 font-bold text-white">${sym}</td>
+                            <td class="py-3">
+                                <button onclick="changeChartSymbol('${sym}'); closeRadarModal();" class="px-2.5 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[11px] font-bold transition-colors">
+                                    Grafiği Aç
+                                </button>
+                            </td>
+                            <td class="py-3">${dirBadge}</td>
+                            <td class="py-3 font-bold text-cyan-400">${score}</td>
+                            <td class="py-3 text-amber-300 font-bold">${rsi}</td>
+                            <td class="py-3 text-slate-300 text-[11px]">${regime}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-rose-400">Veriler yüklenirken hata oluştu: ${e.message}</td></tr>`;
+            }
+        }
+
+        function closeRadarModal() {
+            const modal = document.getElementById('radarModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ── Veri Getirme ve Kart Güncellemeleri ────────────────────────────
         async function fetchStatus() {
             try {
                 const r = await fetch('/api/status');
@@ -403,6 +648,7 @@
             try {
                 const r = await fetch('/api/positions');
                 const data = await r.json();
+                currentPositionsData = data;
                 renderPositions(data);
             } catch(e) {}
         }
@@ -417,11 +663,9 @@
 
         function updateStatusCards(d) {
             const bal = d.balance_usdt ? parseFloat(d.balance_usdt) : 0;
-            let balDisplay = '0.00';
-            if (bal > 0 && bal < 0.01) {
-                balDisplay = bal.toFixed(6);
-            } else {
-                balDisplay = bal.toFixed(2);
+            let balDisplay = '0.0000';
+            if (bal > 0) {
+                balDisplay = bal < 1 ? bal.toFixed(6) : bal.toFixed(4);
             }
             document.getElementById('balance').textContent = balDisplay;
             
@@ -431,7 +675,7 @@
             pnlEl.className = 'text-3xl font-extrabold font-mono tracking-tight ' + (pnl >= 0 ? 'text-emerald-400' : 'text-rose-400');
             
             document.getElementById('openPos').textContent = d.open_positions ?? 0;
-            document.getElementById('posCountText').textContent = `${d.open_positions ?? 0} Aktif`;
+            document.getElementById('posCountText').textContent = `${d.open_positions ?? 0} Aktif (Tıkla ve İncele)`;
             document.getElementById('symbols').textContent = d.symbols_tracked > 0 ? d.symbols_tracked : 20;
 
             document.getElementById('lastUpdate').textContent = 'Son: ' + new Date().toLocaleTimeString('tr-TR');
@@ -453,17 +697,18 @@
                 lucide.createIcons();
                 return;
             }
-            tbody.innerHTML = data.map(t => {
+            tbody.innerHTML = data.map((t, idx) => {
                 const isLong = t.side === 'LONG';
                 const sideBadge = isLong
                     ? '<span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">LONG</span>'
                     : '<span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold">SHORT</span>';
                 
                 return `
-                    <tr class="hover:bg-white/[0.02] transition-colors">
+                    <tr onclick="openPositionDetail(${idx})" class="hover:bg-indigo-500/10 cursor-pointer transition-colors group" title="Detayları görmek için tıkla">
                         <td class="py-3 font-bold text-white flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full ${isLong ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
-                            ${t.symbol}
+                            <span>${t.symbol}</span>
+                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-white/5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">Detay ➔</span>
                         </td>
                         <td class="py-3">${sideBadge}</td>
                         <td class="py-3 text-slate-200 font-mono">${fmt(t.entry_price)}</td>

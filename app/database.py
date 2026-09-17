@@ -208,3 +208,12 @@ async def update_daily_stat(pnl_delta: Decimal, win: bool, ending_balance: Decim
             stat.num_wins = (stat.num_wins or 0) + 1
         stat.ending_balance = ending_balance
         await session.commit()
+
+
+async def get_recent_signals(limit: int = 30) -> List[Signal]:
+    """Son üretilen AI sinyallerini döner."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Signal).order_by(Signal.timestamp.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
