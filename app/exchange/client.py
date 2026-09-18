@@ -94,9 +94,9 @@ class BinanceClient:
         if self._session is None:
             raise RuntimeError("BinanceClient.start() çağrılmadı")
         url = f"{config.REST_BASE}{path}"
-        req_params = None
         if params is None:
             params = {}
+        req_params = None if signed else params
         last_exc: Exception = RuntimeError("Unknown")
         for attempt in range(retries):
             # İmzalı isteklerde her denemede taze timestamp üret
