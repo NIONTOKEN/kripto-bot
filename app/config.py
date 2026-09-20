@@ -29,36 +29,36 @@ class Config:
     # ─── Binance ─────────────────────────────────────────────────────────────
     BINANCE_API_KEY: str = _required("BINANCE_API_KEY")
     BINANCE_SECRET_KEY: str = _required("BINANCE_SECRET_KEY")
-    BINANCE_TESTNET: bool = _opt("BINANCE_TESTNET", "true").lower() == "true"
+    BINANCE_TESTNET: bool = _opt("BINANCE_TESTNET", "false").lower() == "true"
 
     REST_BASE: str = (
         "https://testnet.binancefuture.com"
-        if _opt("BINANCE_TESTNET", "true").lower() == "true"
+        if _opt("BINANCE_TESTNET", "false").lower() == "true"
         else "https://fapi.binance.com"
     )
     WS_BASE: str = (
         "wss://stream.binancefuture.com"
-        if _opt("BINANCE_TESTNET", "true").lower() == "true"
+        if _opt("BINANCE_TESTNET", "false").lower() == "true"
         else "wss://fstream.binance.com"
     )
 
     # ─── Trading ─────────────────────────────────────────────────────────────
-    LEVERAGE: int = int(_opt("LEVERAGE", "5"))
-    MAX_OPEN_POSITIONS: int = int(_opt("MAX_OPEN_POSITIONS", "5"))
-    RISK_PER_TRADE_PCT: Decimal = Decimal(_opt("RISK_PER_TRADE_PCT", "1.0"))
-    MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "65.0"))
-    MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "50.0"))
+    LEVERAGE: int = int(_opt("LEVERAGE", "15"))
+    MAX_OPEN_POSITIONS: int = int(_opt("MAX_OPEN_POSITIONS", "4"))
+    RISK_PER_TRADE_PCT: Decimal = Decimal(_opt("RISK_PER_TRADE_PCT", "28.0"))
+    MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "42.0"))
+    MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "1.0"))
     MAX_LEVERAGE: int = int(_opt("MAX_LEVERAGE", "20"))
     ONLY_LONG: bool = _opt("ONLY_LONG", "true").lower() == "true"
 
     # ─── Risk ────────────────────────────────────────────────────────────────
-    DAILY_LOSS_LIMIT_PCT: Decimal = Decimal(_opt("DAILY_LOSS_LIMIT_PCT", "5.0"))
-    SL_ATR_MULTIPLIER: Decimal = Decimal(_opt("SL_ATR_MULTIPLIER", "1.5"))
-    TP_ATR_MULTIPLIER: Decimal = Decimal(_opt("TP_ATR_MULTIPLIER", "3.0"))
-    TRAILING_STOP: bool = _opt("TRAILING_STOP", "false").lower() == "true"
+    DAILY_LOSS_LIMIT_PCT: Decimal = Decimal(_opt("DAILY_LOSS_LIMIT_PCT", "50.0"))
+    SL_ATR_MULTIPLIER: Decimal = Decimal(_opt("SL_ATR_MULTIPLIER", "2.5"))
+    TP_ATR_MULTIPLIER: Decimal = Decimal(_opt("TP_ATR_MULTIPLIER", "5.0"))
+    TRAILING_STOP: bool = _opt("TRAILING_STOP", "true").lower() == "true"
 
     # ─── Semboller ───────────────────────────────────────────────────────────
-    TOP_SYMBOLS_COUNT: int = int(_opt("TOP_SYMBOLS_COUNT", "20"))
+    TOP_SYMBOLS_COUNT: int = int(_opt("TOP_SYMBOLS_COUNT", "50"))
     BLACKLIST: List[str] = [
         s.strip().upper()
         for s in _opt("BLACKLIST", "").split(",")
@@ -66,7 +66,7 @@ class Config:
     ]
 
     # ─── Zaman Dilimleri ─────────────────────────────────────────────────────
-    PRIMARY_TF: str = _opt("PRIMARY_TF", "15m")
+    PRIMARY_TF: str = _opt("PRIMARY_TF", "5m")
     HIGHER_TF: str = _opt("HIGHER_TF", "1h")
     KLINE_LIMIT: int = int(_opt("KLINE_LIMIT", "300"))
 
@@ -76,8 +76,8 @@ class Config:
     ML_MIN_SAMPLES: int = int(_opt("ML_MIN_SAMPLES", "100"))
 
     # ─── Telegram ────────────────────────────────────────────────────────────
-    TELEGRAM_BOT_TOKEN: str = _opt("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_CHAT_ID: str = _opt("TELEGRAM_CHAT_ID", "")
+    TELEGRAM_BOT_TOKEN: str = _opt("TELEGRAM_BOT_TOKEN", "8830972901:AAF3vEj2HszCoZ84K6nQC97oGTzcemvg20Y")
+    TELEGRAM_CHAT_ID: str = _opt("TELEGRAM_CHAT_ID", "1505452121")
 
     # ─── Dashboard ───────────────────────────────────────────────────────────
     DASHBOARD_HOST: str = _opt("DASHBOARD_HOST", "0.0.0.0")

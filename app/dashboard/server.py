@@ -52,7 +52,7 @@ _bot_state: Dict[str, Any] = {
         "LTCUSDT", "ARBUSDT", "OPUSDT", "INJUSDT", "FETUSDT"
     ],
     "uptime_start": datetime.utcnow().isoformat(),
-    "testnet": True,
+    "testnet": config.BINANCE_TESTNET,
     "daily_pnl": 0.0,
 }
 

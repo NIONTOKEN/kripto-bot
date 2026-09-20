@@ -405,6 +405,7 @@ class OrderManager:
         """
         try:
             open_trades = await get_open_trades()
+            open_symbols = {t.symbol: t for t in open_trades}
             binance_positions = {p["symbol"]: p for p in await self._client.get_positions()}
 
             for trade in open_trades:
@@ -418,6 +419,41 @@ class OrderManager:
                         status="CLOSED",
                         close_reason="SYNC",
                         closed_at=datetime.utcnow(),
+                    )
+
+            # Binance'de olup veritabanında olmayan pozisyonları veritabanına aktar
+            for sym, pos in binance_positions.items():
+                if sym not in open_symbols:
+                    pos_amt = Decimal(pos.get("positionAmt", "0"))
+                    if pos_amt == Decimal("0"):
+                        continue
+                    entry_p = Decimal(pos.get("entryPrice", "0"))
+                    side = "LONG" if pos_amt > 0 else "SHORT"
+                    qty = abs(pos_amt)
+                    leverage = int(pos.get("leverage", config.LEVERAGE))
+                    mark_p = Decimal(pos.get("markPrice", str(entry_p)))
+
+                    sl_price = entry_p * Decimal("0.97") if side == "LONG" else entry_p * Decimal("1.03")
+                    tp_price = entry_p * Decimal("1.06") if side == "LONG" else entry_p * Decimal("0.94")
+
+                    new_trade = Trade(
+                        symbol=sym,
+                        side=side,
+                        entry_price=entry_p,
+                        sl_price=sl_price,
+                        tp_price=tp_price,
+                        quantity=qty,
+                        leverage=leverage,
+                        status="OPEN",
+                        opened_at=datetime.utcnow(),
+                        signal_score=50.0,
+                        ml_confidence=0.5,
+                        regime="RANGING",
+                    )
+                    await save_trade(new_trade)
+                    self._trail_highs[sym] = mark_p
+                    logger.info(
+                        f"[{sym}] Binance'deki açık pozisyon DB'ye senkronize edildi: {side} {qty} @ {entry_p}"
                     )
         except Exception as exc:
             logger.error(f"Pozisyon senkronizasyon hatası: {exc}")
