@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -132,6 +132,50 @@ class TestDynamicLeverageAndRisk(unittest.TestCase):
         self.assertLessEqual(leverage, 8)
         self.assertGreater(sl_price, Decimal('2.0'))
         self.assertLess(tp_price, Decimal('2.0'))
+
+
+class TestAlphaPulseMatrix(unittest.TestCase):
+    def test_alphapulse_bullish_and_bearish(self):
+        from app.strategy.alphapulse import calculate_alphapulse
+        from app.strategy.orderbook import OrderBookAnalysis
+
+        ind_bull = make_indicators(close=100.0, atr=1.5)
+        # Give bull indicators
+        ind_bull.ema9 = 102.0
+        ind_bull.ema21 = 100.0
+        ind_bull.ema50 = 98.0
+        ind_bull.ema200 = 90.0
+        ind_bull.rsi = 58.0
+        ind_bull.volume_ratio = 1.8
+
+        candles = [
+            {"open": 98.0, "high": 99.0, "low": 97.5, "close": 98.5},
+            {"open": 98.5, "high": 100.5, "low": 98.2, "close": 100.2},
+        ]
+
+        ob_bull = OrderBookAnalysis(
+            imbalance=0.35,
+            bid_volume_usdt=500000.0,
+            ask_volume_usdt=200000.0,
+            has_bid_wall=True,
+            has_ask_wall=False,
+            bid_wall_price=99.5,
+            ask_wall_price=105.0,
+            signal_score=85.0,
+            bias="BULLISH",
+        )
+
+        res_bull = calculate_alphapulse(
+            ind=ind_bull,
+            candles=candles,
+            ob=ob_bull,
+            funding_rate=-0.0004,
+            trend_1h="BULLISH",
+            trend_4h="BULLISH",
+        )
+        self.assertGreaterEqual(res_bull.alpha_score, 65.0)
+        self.assertIn(res_bull.bias, ("BUY", "STRONG_BUY"))
+        self.assertEqual(res_bull.funding_bias, "SQUEEZE_LONG")
 
 
 if __name__ == '__main__':

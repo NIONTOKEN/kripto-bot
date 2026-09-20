@@ -387,7 +387,13 @@ class TradingBot:
             except Exception as htf_err:
                 logger.debug(f"[{symbol}] HTF (1H/4H) analiz hatası: {htf_err}")
 
-        # ── 5. Sinyal skoru (Tahta + Trend + BTC Makro + 1H & 4H Trend Hibrit) ─
+        # ── 5. Sinyal skoru (AlphaPulse 10-Faktör + Tahta + Trend + HTF Hibrit) ─
+        funding_rate = 0.0
+        try:
+            funding_rate = await self.client.get_funding_rate(symbol)
+        except Exception:
+            pass
+
         signal = calculate_signal(
             ind,
             ml_prob,
@@ -396,6 +402,8 @@ class TradingBot:
             btc_bullish=btc_bullish,
             trend_1h=trend_1h,
             trend_4h=trend_4h,
+            candles=candles,
+            funding_rate=funding_rate,
         )
 
         # Soğuma süresindeyse yönü nötrle (işlem açma)
@@ -407,7 +415,7 @@ class TradingBot:
         btc_str = "BTC=BULL" if btc_bullish is True else "BTC=BEAR" if btc_bullish is False else "BTC=—"
         type_str = f" [{signal.signal_type}]" if signal.signal_type != "NORMAL" else ""
         logger.info(
-            f"[{symbol}] skor={signal.score:.1f} yön={signal.direction}{type_str} "
+            f"[{symbol}] skor={signal.score:.1f} (Alpha={signal.alpha_score:.0f}) yön={signal.direction}{type_str} "
             f"RSI={ind.rsi:.1f} {ob_info} {btc_str} 4H={trend_4h} 1H={trend_1h} rejim={regime.value}"
         )
 

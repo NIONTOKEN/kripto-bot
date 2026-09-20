@@ -285,6 +285,26 @@ class BinanceClient:
         )
         return Decimal(data["markPrice"])
 
+    async def get_funding_rate(self, symbol: str) -> float:
+        """Son 8 saatlik Fonlama Oranı (Funding Rate)."""
+        try:
+            data = await self._request(
+                "GET", "/fapi/v1/premiumIndex", params={"symbol": symbol}
+            )
+            return float(data.get("lastFundingRate", 0.0))
+        except Exception:
+            return 0.0
+
+    async def get_open_interest(self, symbol: str) -> float:
+        """Açık Pozisyon Hacmi (Open Interest)."""
+        try:
+            data = await self._request(
+                "GET", "/fapi/v1/openInterest", params={"symbol": symbol}
+            )
+            return float(data.get("openInterest", 0.0))
+        except Exception:
+            return 0.0
+
     async def get_order_book(self, symbol: str, limit: int = 50) -> Dict:
         """
         Derinlik (Order Book / Tahta) verisi.

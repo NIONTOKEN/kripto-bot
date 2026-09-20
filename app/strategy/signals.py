@@ -10,6 +10,7 @@ from app.config import config
 from app.strategy.indicators import IndicatorResult
 from app.strategy.regime import Regime
 from app.strategy.orderbook import OrderBookAnalysis
+from app.strategy.alphapulse import calculate_alphapulse, AlphaPulseResult
 
 @dataclass
 class SignalResult:
@@ -23,7 +24,8 @@ class SignalResult:
     bb_contrib: float
     volume_contrib: float
     adx_contrib: float
-    signal_type: str = "NORMAL"  # SUPER_LONG, COLLAPSE_SHORT, INTRADAY_LONG, NORMAL
+    signal_type: str = "NORMAL"  # SUPER_LONG, COLLAPSE_SHORT, INTRADAY_LONG, NORMAL, SCALP_LONG, SCALP_SHORT
+    alpha_score: float = 50.0
 
 def calculate_signal(
     ind: IndicatorResult,
@@ -33,6 +35,9 @@ def calculate_signal(
     btc_bullish: Optional[bool] = None,
     trend_1h: str = "NEUTRAL",
     trend_4h: str = "NEUTRAL",
+    candles: Optional[list[dict]] = None,
+    funding_rate: float = 0.0,
+    open_interest: float = 0.0,
 ) -> SignalResult:
     ml = ml_confidence if ml_confidence is not None else 0.5
 
@@ -130,20 +135,31 @@ def calculate_signal(
         (ind.rsi > 32 and ind.rsi < 64)
     )
 
-    # ⚡ E) SCALP_LONG (Hızlı Vur-Kaç Long - Anlık Alıcı Baskısı):
+    # ── 10 Faktörlü AlphaPulse Matrix Analizi ────────────────────────────────
+    alpha_res = calculate_alphapulse(
+        ind=ind,
+        candles=candles or [],
+        ob=ob,
+        funding_rate=funding_rate,
+        open_interest=open_interest,
+        trend_1h=trend_1h,
+        trend_4h=trend_4h,
+    )
+
+    # ⚡ E) SCALP_LONG (Hızlı Vur-Kaç Long - Anlık Alıcı Baskısı & Tahta Dengesizliği):
     allow_scalp_long = (
         config.SCALP_MODE and
-        (ob is not None and ob.imbalance >= 20.0) and
-        (total > 0.20) and
+        (ob is not None and ob.imbalance >= 0.18) and
+        (total > 0.18 or alpha_res.alpha_score >= 62.0) and
         (not (ob and ob.has_ask_wall)) and
         (ind.rsi < 75)
     )
 
-    # ⚡ F) SCALP_SHORT (Hızlı Vur-Kaç Short - Anlık Satıcı Baskısı):
+    # ⚡ F) SCALP_SHORT (Hızlı Vur-Kaç Short - Anlık Satıcı Baskısı & Tahta Dengesizliği):
     allow_scalp_short = (
         config.SCALP_MODE and
-        (ob is not None and ob.imbalance <= -20.0) and
-        (total < -0.20) and
+        (ob is not None and ob.imbalance <= -0.18) and
+        (total < -0.18 or alpha_res.alpha_score <= 38.0) and
         (not (ob and ob.has_bid_wall)) and
         (ind.rsi > 25)
     )
@@ -157,11 +173,19 @@ def calculate_signal(
         direction = "LONG"
         score = min(100.0, total * 110)
         signal_type = "SUPER_LONG"
-    elif allow_scalp_long and total > 0.28:
+    elif alpha_res.bias == "STRONG_BUY" and (not (ob and ob.has_ask_wall)):
+        direction = "LONG"
+        score = min(100.0, alpha_res.alpha_score * 1.1)
+        signal_type = "SCALP_LONG" if (ob and ob.imbalance >= 0.15) else "INTRADAY_LONG"
+    elif alpha_res.bias == "STRONG_SELL" and (not (ob and ob.has_bid_wall)):
+        direction = "SHORT"
+        score = min(100.0, (100.0 - alpha_res.alpha_score) * 1.1)
+        signal_type = "SCALP_SHORT" if (ob and ob.imbalance <= -0.15) else "INTRADAY_SHORT"
+    elif allow_scalp_long and total > 0.25:
         direction = "LONG"
         score = min(100.0, total * 115)
         signal_type = "SCALP_LONG"
-    elif allow_scalp_short and total < -0.28:
+    elif allow_scalp_short and total < -0.25:
         direction = "SHORT"
         score = min(100.0, abs(total) * 115)
         signal_type = "SCALP_SHORT"
@@ -216,4 +240,5 @@ def calculate_signal(
         volume_contrib=round(ind.volume_ratio, 2),
         adx_contrib=round(adx_score, 2),
         signal_type=signal_type,
+        alpha_score=alpha_res.alpha_score,
     )
