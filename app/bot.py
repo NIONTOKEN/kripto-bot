@@ -237,11 +237,12 @@ class TradingBot:
             logger.warning(f"[{symbol}] Geçmiş veri yükleme hatası: {exc}")
 
     async def _seed_all_symbols(self) -> None:
-        """Tüm sembolleri paralel olarak yükle."""
+        """Sembol geçmiş verilerini rate limit'e takılmadan sırayla yükle."""
         logger.info(f"Geçmiş veri yükleniyor ({len(self._symbols)} sembol)...")
-        tasks = [self._seed_symbol(s) for s in self._symbols]
-        await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info("Geçmiş veri yüklendi")
+        for s in self._symbols:
+            await self._seed_symbol(s)
+            await asyncio.sleep(0.25)  # Binance rate limit koruması
+        logger.info("Geçmiş veri başarıyla yüklendi")
 
     # ── Kline İşleme ──────────────────────────────────────────────────────────
 
@@ -632,30 +633,36 @@ def get_bot() -> Optional[TradingBot]:
 
 
 async def run_bot() -> None:
-    """Bot'u başlat ve çalıştır."""
+    """Bot'u başlat ve çalıştır (Hata durumunda otomatik kendini toparlar)."""
     global _bot, _fatal_error
-    _bot = TradingBot()
-    try:
-        await _bot.start()
-        # Bot başlatıldıktan sonra burada bekle
-        while _bot._running:
-            await asyncio.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Kullanıcı tarafından durduruldu")
-    except Exception as exc:
-        _fatal_error = True
-        err_msg = f"{type(exc).__name__}: {exc}"
-        logger.critical(f"FATAL HATA: {err_msg}")
-        logger.critical(traceback.format_exc())
-        update_bot_state(error=err_msg, running=False)
-        if _bot and _bot.notifier:
+    retry_delay = 20
+    while True:
+        _bot = TradingBot()
+        try:
+            await _bot.start()
+            while _bot._running:
+                await asyncio.sleep(1)
+            break
+        except KeyboardInterrupt:
+            logger.info("Kullanıcı tarafından durduruldu")
+            break
+        except Exception as exc:
+            err_msg = f"{type(exc).__name__}: {exc}"
+            logger.error(f"Bot başlangıç/çalışma hatası: {err_msg}. {retry_delay} saniye sonra yeniden denenecek...")
+            update_bot_state(error=err_msg, running=False)
+            if _bot and _bot.notifier:
+                try:
+                    await _bot.notifier.error_alert(f"Bot uyarısı (Yeniden başlatılıyor):\n{err_msg}")
+                except Exception:
+                    pass
             try:
-                await _bot.notifier.error_alert(
-                    f"Bot fatal hata ile durduruldu:\n{err_msg}"
-                )
+                await _bot.stop()
             except Exception:
                 pass
-        # Mevcut pozisyonlar korunmaya devam eder (SL/TP Binance'de kalır)
-    finally:
-        if _bot:
-            await _bot.stop()
+            await asyncio.sleep(retry_delay)
+        finally:
+            if _bot and not _bot._running:
+                try:
+                    await _bot.stop()
+                except Exception:
+                    pass

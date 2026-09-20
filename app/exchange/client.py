@@ -117,11 +117,20 @@ class BinanceClient:
                     async with self._session.request(method, actual_url, params=req_params) as resp:
                         data = await resp.json(content_type=None)
 
-                        # 429 veya -1003: IP ban → hemen dur, retry etme!
+                        # 429 veya -1003: IP rate limit / geçici bekleme
                         if resp.status == 429 or (isinstance(data, dict) and data.get("code") == -1003):
                             ban_msg = data.get("msg", "Rate limit aşıldı") if isinstance(data, dict) else "Rate limit"
-                            logger.critical(f"⛔ RATE LIMIT / IP BAN: {ban_msg}")
-                            raise RuntimeError(f"Binance -1003: {ban_msg}")
+                            logger.warning(f"⏳ BINANCE RATE LIMIT: {ban_msg}")
+                            import re
+                            match = re.search(r"banned until (\d+)", ban_msg)
+                            wait_sec = 45
+                            if match:
+                                ban_ts = int(match.group(1))
+                                current_ts = int(time.time() * 1000)
+                                wait_sec = max(5, min(180, (ban_ts - current_ts) // 1000 + 3))
+                            logger.info(f"Rate limit nedeniyle {wait_sec} saniye bekleniyor, ardından devam edilecek...")
+                            await asyncio.sleep(wait_sec)
+                            continue
 
                         if resp.status == 200:
                             return data

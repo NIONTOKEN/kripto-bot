@@ -61,7 +61,7 @@ class Config:
     TRAILING_STOP: bool = _opt("TRAILING_STOP", "true").lower() == "true"
 
     # ─── Semboller ───────────────────────────────────────────────────────────
-    TOP_SYMBOLS_COUNT: int = int(_opt("TOP_SYMBOLS_COUNT", "50"))
+    TOP_SYMBOLS_COUNT: int = int(_opt("TOP_SYMBOLS_COUNT", "20"))
     BLACKLIST: List[str] = [
         s.strip().upper()
         for s in _opt("BLACKLIST", "").split(",")
