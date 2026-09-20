@@ -148,6 +148,7 @@ async def get_status() -> dict:
         "symbols_tracked": _bot_state["symbols_tracked"],
         "daily_pnl": _bot_state["daily_pnl"],
         "uptime_start": _bot_state["uptime_start"],
+        "error": _bot_state.get("error", None),
         "server_time": datetime.utcnow().isoformat(),
     }
 

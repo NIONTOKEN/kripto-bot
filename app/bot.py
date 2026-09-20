@@ -631,12 +631,17 @@ async def run_bot() -> None:
         logger.info("Kullanıcı tarafından durduruldu")
     except Exception as exc:
         _fatal_error = True
-        logger.critical(f"FATAL HATA: {exc}")
+        err_msg = f"{type(exc).__name__}: {exc}"
+        logger.critical(f"FATAL HATA: {err_msg}")
         logger.critical(traceback.format_exc())
+        update_bot_state(error=err_msg, running=False)
         if _bot and _bot.notifier:
-            await _bot.notifier.error_alert(
-                f"Bot fatal hata ile durduruldu:\n{exc}"
-            )
+            try:
+                await _bot.notifier.error_alert(
+                    f"Bot fatal hata ile durduruldu:\n{err_msg}"
+                )
+            except Exception:
+                pass
         # Mevcut pozisyonlar korunmaya devam eder (SL/TP Binance'de kalır)
     finally:
         if _bot:
