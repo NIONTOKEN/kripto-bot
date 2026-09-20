@@ -16,7 +16,10 @@ def _configure_root() -> None:
     if root.handlers:
         return  # zaten yapılandırılmış
 
-    handler = logging.StreamHandler(sys.stdout)
+    import io
+    # Windows cp1254 unicode encode hatasını engelle
+    stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    handler = logging.StreamHandler(stream)
     handler.setFormatter(logging.Formatter(_FMT, _DATE_FMT))
     root.addHandler(handler)
     root.setLevel(logging.INFO)

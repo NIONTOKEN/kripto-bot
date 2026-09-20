@@ -60,14 +60,15 @@ class RiskManager:
         if config.LEVERAGE > config.MAX_LEVERAGE:
             return RiskCheck(False, f"Kaldıraç limiti aşıldı: {config.LEVERAGE} > {config.MAX_LEVERAGE}")
 
-        # 4. Günlük kayıp limiti
+        # 4. Günlük kayıp limiti (Sadece gerçekleşen net zarara bakar, marjini zarar saymaz!)
         if self._starting_balance and self._starting_balance > 0:
+            from app.database import get_todays_closed_pnl
+            todays_pnl = await get_todays_closed_pnl()
             daily_loss_limit = self._starting_balance * config.DAILY_LOSS_LIMIT_PCT / Decimal("100")
-            daily_loss = self._starting_balance - current_balance
-            if daily_loss > daily_loss_limit:
+            if todays_pnl < 0 and abs(todays_pnl) > daily_loss_limit:
                 return RiskCheck(
                     False,
-                    f"Günlük kayıp limiti: {daily_loss:.2f} > {daily_loss_limit:.2f} USDT"
+                    f"Günlük gerçekleşen kayıp limiti: {abs(todays_pnl):.2f} > {daily_loss_limit:.2f} USDT"
                 )
 
         return RiskCheck(True)
@@ -78,17 +79,12 @@ class RiskManager:
         ind: IndicatorResult,
         balance: Decimal,
         direction: str,
+        signal_type: str = "NORMAL",
     ) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
         """
-        ATR tabanlı pozisyon boyutu hesapla.
+        ATR tabanlı ve otomatik bileşik büyümeli pozisyon boyutu hesapla.
 
         Returns: (quantity, sl_price, tp_price) veya (None, None, None)
-
-        Yöntem:
-        - Risk miktarı = balance × RISK_PER_TRADE_PCT / 100
-        - SL mesafesi = ATR × SL_ATR_MULTIPLIER
-        - Notional = Risk / (SL_mesafesi / fiyat) / kaldıraç
-        - Quantity = Notional / fiyat
         """
         try:
             price = Decimal(str(ind.close))
@@ -98,69 +94,89 @@ class RiskManager:
                 logger.warning(f"[{symbol}] Geçersiz fiyat veya ATR")
                 return None, None, None
 
-            # Risk miktarı (USDT)
-            risk_usdt = balance * config.RISK_PER_TRADE_PCT / Decimal("100")
+            # ── 1. OTOMATİK BİLEŞİK BÜYÜME (AUTO-COMPOUNDING) MARJİN BELİRLEME ───
+            # Cüzdan bakiyesine göre kademeli pozisyon marjini:
+            # - Bakiye < 25 USDT: %25 marjin per pozisyon (örn: 11$ -> ~2.75$ marjin)
+            # - 25 <= Bakiye < 100 USDT: %22 marjin (örn: 50$ -> 11$ marjin)
+            # - 100 <= Bakiye < 1000 USDT: %20 marjin (örn: 250$ -> 50$ marjin)
+            # - Bakiye >= 1000 USDT: %15 marjin (örn: 2000$ -> 300$ marjin)
+            if balance < Decimal("25"):
+                margin_pct = Decimal("0.25")
+            elif balance < Decimal("100"):
+                margin_pct = Decimal("0.22")
+            elif balance < Decimal("1000"):
+                margin_pct = Decimal("0.20")
+            else:
+                margin_pct = Decimal("0.15")
 
-            # SL/TP mesafeleri
-            sl_distance = atr * config.SL_ATR_MULTIPLIER
-            tp_distance = atr * config.TP_ATR_MULTIPLIER
+            target_margin = balance * margin_pct
+            target_margin = max(target_margin, Decimal("2.0"))  # Binance min işlem için en az 2 USDT
+            target_notional = target_margin * Decimal(str(config.LEVERAGE))
 
-            # SL/TP fiyatları
-            if direction == "LONG":
-                sl_price = price - sl_distance
-                tp_price = price + tp_distance
-                if sl_price <= 0:
-                    return None, None, None
-            else:  # SHORT
-                sl_price = price + sl_distance
-                tp_price = price - tp_distance
-                if tp_price <= 0:
-                    return None, None, None
-
-            # Pozisyon büyüklüğü hesabı
-            # Kayıp = qty × sl_distance (kaldıraçsız, isolated margin)
-            # risk_usdt = qty × sl_distance
-            # qty = risk_usdt / sl_distance
-            qty_unlevered = risk_usdt / sl_distance
-
-            # Kaldıraç pozisyon boyutunu büyütür
-            # Ama risk hesabında kaldıraçı dahil ediyoruz:
-            # Gerçek kayıp = qty × sl_distance (kaldıraçlı marginden)
-            # Margin gereksinimi = qty × price / leverage
-            qty = qty_unlevered  # kaldıraç risk hesabına dahil değil, sadece marjine etkisi var
-
-            # Minimum qty ve notional kontrolü & Mikro bakiye desteği:
+            # Minimum qty ve notional kontrolleri (Binance kuralları)
             min_qty = self._client.get_min_qty(symbol)
             min_notional = self._client.get_min_notional(symbol)
-            
-            # Eğer hesaplanan pozisyon Binance minimumunun altındaysa ama bakiye yetiyorsa minimuma yükselt
-            notional = qty * price
-            if notional < min_notional:
-                min_req_qty = self._client.round_qty(symbol, (min_notional * Decimal("1.05")) / price)
-                min_req_qty = max(min_req_qty, min_qty)
-                req_margin = (min_req_qty * price) / Decimal(str(config.LEVERAGE))
-                if req_margin <= balance * Decimal("0.98"):
-                    qty = min_req_qty
-                    notional = qty * price
-                else:
-                    logger.warning(
-                        f"[{symbol}] Notional {notional:.2f} < min {min_notional} ve marjin yetersiz (gerekli: {req_margin:.2f}, bakiye: {balance:.2f})"
-                    )
-                    return None, None, None
+            target_notional = max(target_notional, min_notional * Decimal("1.15"))
 
-            if qty < min_qty:
-                qty = min_qty
-                notional = qty * price
+            # Hedef miktar (quantity)
+            raw_qty = target_notional / price
+            qty = self._client.round_qty(symbol, raw_qty)
+            qty = max(qty, min_qty)
 
-            # Margin kontrolü: yeterli bakiye var mı?
+            # Gerekli marjin kontrolü
             required_margin = (qty * price) / Decimal(str(config.LEVERAGE))
-            if required_margin > balance * Decimal("0.98"):
-                logger.warning(f"[{symbol}] Yetersiz margin: {required_margin:.2f} > {balance:.2f}")
+            if required_margin > balance * Decimal("0.90"):
+                # Bakiye yetersizse bakiyenin %85'ine sığacak maksimum miktarı ver
+                max_afford_notional = (balance * Decimal("0.85")) * Decimal(str(config.LEVERAGE))
+                if max_afford_notional < min_notional:
+                    logger.warning(f"[{symbol}] Bakiye en küçük işlem için yetersiz: {balance:.2f} USDT")
+                    return None, None, None
+                qty = self._client.round_qty(symbol, max_afford_notional / price)
+                qty = max(qty, min_qty)
+                required_margin = (qty * price) / Decimal(str(config.LEVERAGE))
+
+            # ── 2. STOP LOSS & TAKE PROFIT (MAKRO ÇÖKÜŞ & PARABOLİK TREND AYARI) ─
+            if signal_type == "COLLAPSE_SHORT":
+                # LUNA tipi makro çöküş: Erken kâr alıp çıkmak YASAK!
+                # Günlerce, haftalarca sürmek için TP tabanı çok derin (%85 çöküş hedefi),
+                # İşlemi Trailing Stop dipten takip eder.
+                sl_distance = max(atr * Decimal("3.0"), price * Decimal("0.035"))
+                tp_distance = price * Decimal("0.85")
+                sl_price = price + sl_distance
+                tp_price = max(price - tp_distance, price * Decimal("0.05"))
+            elif signal_type == "SUPER_LONG":
+                # Parabolik boğa koşusu: Günlerce sürülmesi için geniş TP (%200 yükseliş hedefi)
+                sl_distance = max(atr * Decimal("3.0"), price * Decimal("0.035"))
+                tp_distance = price * Decimal("2.00")
+                sl_price = price - sl_distance
+                tp_price = price + tp_distance
+            else:
+                # Normal gün içi trend işlemleri
+                min_sl_dist = price * Decimal("0.020")
+                calc_sl_dist = atr * Decimal(str(config.SL_ATR_MULTIPLIER))
+                sl_distance = max(calc_sl_dist, min_sl_dist)
+
+                min_tp_dist = sl_distance * Decimal("1.8")
+                calc_tp_dist = atr * Decimal(str(config.TP_ATR_MULTIPLIER))
+                tp_distance = max(calc_tp_dist, min_tp_dist)
+
+                if direction == "LONG":
+                    sl_price = price - sl_distance
+                    tp_price = price + tp_distance
+                else:
+                    sl_price = price + sl_distance
+                    tp_price = price - tp_distance
+
+            if sl_price <= 0 or tp_price <= 0:
                 return None, None, None
 
             sl_price = self._client.round_price(symbol, sl_price)
             tp_price = self._client.round_price(symbol, tp_price)
 
+            logger.info(
+                f"[{symbol}] Pozisyon Boyutu Hesaplandı ({signal_type}): Notional={qty * price:.2f}$ "
+                f"(Marjin={required_margin:.2f}$ [{config.LEVERAGE}x]) | SL={sl_price} | TP={tp_price}"
+            )
             return qty, sl_price, tp_price
 
         except Exception as exc:

@@ -131,18 +131,21 @@
                     <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="balance">0.00</span>
                     <span class="text-sm font-bold text-cyan-400">USDT</span>
                 </div>
-                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5 font-mono">
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5 font-mono" id="balanceSubtext">
                     <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
                     Binance USDⓈ-M Futures
                 </div>
             </div>
 
             <!-- Günlük PnL -->
-            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
+            <div onclick="openStatsModal()" class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group cursor-pointer border border-emerald-500/20 hover:border-emerald-400/50">
                 <div class="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Bugünkü Net Kâr/Zarar</span>
-                    <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <span>Bugünkü Net Kâr/Zarar</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Tıkla Gör</span>
+                    </span>
+                    <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 group-hover:scale-110 transition-transform">
                         <i data-lucide="trending-up" class="w-4 h-4"></i>
                     </div>
                 </div>
@@ -152,26 +155,29 @@
                 </div>
                 <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
                     <span class="px-1.5 py-0.5 rounded bg-white/5 font-mono text-[11px]" id="winRate">Win Rate: %0.0</span>
-                    <span>• 24 Saatlik Realized</span>
+                    <span>• Detaylı Rapor ➔</span>
                 </div>
             </div>
 
             <!-- Açık Pozisyonlar -->
-            <div class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group">
+            <div onclick="openAllPositionsModal()" class="glass-panel glass-panel-hover rounded-2xl p-5 relative overflow-hidden transition-all duration-300 group cursor-pointer border border-indigo-500/20 hover:border-indigo-400/50">
                 <div class="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Aktif Pozisyonlar</span>
-                    <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <span>Aktif Pozisyonlar</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300">Tıkla Gör</span>
+                    </span>
+                    <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:scale-110 transition-transform">
                         <i data-lucide="layers" class="w-4 h-4"></i>
                     </div>
                 </div>
                 <div class="flex items-baseline gap-2">
                     <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="openPos">0</span>
-                    <span class="text-xs font-mono text-slate-400">/ 5 Maksimum Slot</span>
+                    <span class="text-xs font-mono text-slate-400">/ 4 Maksimum Slot</span>
                 </div>
-                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                    <span>SL / TP Koruması Devrede</span>
+                <div class="mt-2 text-xs text-indigo-300 flex items-center gap-1.5 font-mono">
+                    <i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span>Tüm Pozisyonları Listele ➔</span>
                 </div>
             </div>
 
@@ -188,7 +194,7 @@
                     </div>
                 </div>
                 <div class="flex items-baseline gap-2">
-                    <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="symbols">20</span>
+                    <span class="text-3xl font-extrabold font-mono tracking-tight text-white" id="symbols">—</span>
                     <span class="text-xs font-bold text-purple-400">LİKİT PARİTE</span>
                 </div>
                 <div class="mt-2 text-xs text-purple-300 flex items-center gap-1.5 font-mono">
@@ -304,80 +310,151 @@
 
         </div>
 
-        <!-- Bottom Tables Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            <!-- Açık Pozisyonlar Tablosu -->
-            <div class="glass-panel rounded-2xl p-5">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="crosshair" class="w-5 h-5 text-cyan-400"></i>
+        <!-- Bottom Section: Açık Pozisyonlar (Full Width, Kart Tasarımı) -->
+        <div class="glass-panel rounded-2xl p-6 border border-cyan-500/15">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        <i data-lucide="crosshair" class="w-5 h-5"></i>
+                    </div>
+                    <div>
                         <h3 class="font-bold text-sm tracking-wide text-white uppercase">Açık Vadeli Pozisyonlar</h3>
+                        <p class="text-xs text-slate-400 font-mono" id="posCountText">0 Aktif — Tıklayarak Grafige Git</p>
                     </div>
-                    <span class="text-xs text-slate-400 font-mono" id="posCountText">0 Aktif</span>
                 </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs font-mono">
-                        <thead>
-                            <tr class="border-b border-white/10 text-slate-400">
-                                <th class="pb-3 font-semibold">PARİTE</th>
-                                <th class="pb-3 font-semibold">YÖN</th>
-                                <th class="pb-3 font-semibold">GİRİŞ</th>
-                                <th class="pb-3 font-semibold text-rose-400">STOP LOSS</th>
-                                <th class="pb-3 font-semibold text-emerald-400">TAKE PROFIT</th>
-                                <th class="pb-3 font-semibold">AI SKOR</th>
-                            </tr>
-                        </thead>
-                        <tbody id="positionsTable" class="divide-y divide-white/5">
-                            <tr>
-                                <td colspan="6" class="py-10 text-center text-slate-500 italic">
-                                    <div class="flex flex-col items-center gap-2">
-                                        <i data-lucide="inbox" class="w-8 h-8 stroke-1 text-slate-600"></i>
-                                        <span>Şu an açık pozisyon bulunmuyor</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="flex items-center gap-2 text-xs font-mono">
+                    <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LONG
+                    </span>
+                    <span class="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span> SHORT
+                    </span>
                 </div>
             </div>
 
-            <!-- Son Kapanan İşlemler Tablosu -->
-            <div class="glass-panel rounded-2xl p-5">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="history" class="w-5 h-5 text-indigo-400"></i>
-                        <h3 class="font-bold text-sm tracking-wide text-white uppercase">Son Kapanan İşlemler</h3>
+            <!-- Pozisyon Kartları Grid -->
+            <div id="positionsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div class="col-span-full py-12 text-center text-slate-500 italic">
+                    <div class="flex flex-col items-center gap-3">
+                        <i data-lucide="inbox" class="w-12 h-12 stroke-1 text-slate-700"></i>
+                        <span class="text-sm">Şu an açık pozisyon bulunmuyor</span>
+                        <span class="text-xs text-slate-600">Bot güçlü sinyal bekleniyor...</span>
                     </div>
-                    <span class="text-xs text-slate-400 font-mono">Realized PnL Geçmişi</span>
                 </div>
+            </div>
+        </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs font-mono">
-                        <thead>
-                            <tr class="border-b border-white/10 text-slate-400">
-                                <th class="pb-3 font-semibold">PARİTE</th>
-                                <th class="pb-3 font-semibold">YÖN</th>
-                                <th class="pb-3 font-semibold">NET KÂR/ZARAR</th>
-                                <th class="pb-3 font-semibold">ÇIKIŞ NEDENİ</th>
-                                <th class="pb-3 font-semibold">ZAMAN</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tradesTable" class="divide-y divide-white/5">
-                            <tr>
-                                <td colspan="5" class="py-10 text-center text-slate-500 italic">
-                                    <div class="flex flex-col items-center gap-2">
-                                        <i data-lucide="clock" class="w-8 h-8 stroke-1 text-slate-600"></i>
-                                        <span>Henüz kapanmış işlem kaydı yok</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+        <!-- İşlem Geçmişi (Full Width, Sayfalandırmalı) -->
+        <div class="glass-panel rounded-2xl p-6 border border-indigo-500/15">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        <i data-lucide="history" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm tracking-wide text-white uppercase">İşlem Geçmişi</h3>
+                        <p class="text-xs text-slate-400 font-mono" id="tradesCountLabel">Realized PnL — Tüm Kapanan İşlemler</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="tradesSummaryBadges" class="hidden flex items-center gap-2 text-xs font-mono">
+                        <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" id="tradesWinBadge">✓ 0 Kâr</span>
+                        <span class="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20" id="tradesLossBadge">✗ 0 Zarar</span>
+                    </div>
+                    <select id="tradesPerPageSelect" onchange="renderTradesPage()" class="bg-slate-900/80 text-slate-300 font-mono text-xs px-2.5 py-1.5 rounded-lg border border-white/10 focus:outline-none">
+                        <option value="15">15 satır</option>
+                        <option value="30">30 satır</option>
+                        <option value="50">50 satır</option>
+                        <option value="100">Tümü</option>
+                    </select>
                 </div>
             </div>
 
+            <div class="overflow-x-auto rounded-xl border border-white/5">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-white/[0.03]">
+                        <tr class="border-b border-white/10 text-slate-400">
+                            <th class="px-4 py-3 font-semibold">#</th>
+                            <th class="px-4 py-3 font-semibold">PARİTE</th>
+                            <th class="px-4 py-3 font-semibold">YÖN</th>
+                            <th class="px-4 py-3 font-semibold">GİRİŞ</th>
+                            <th class="px-4 py-3 font-semibold">ÇIKIŞ</th>
+                            <th class="px-4 py-3 font-semibold">NET KÂR/ZARAR</th>
+                            <th class="px-4 py-3 font-semibold">GETİRİ %</th>
+                            <th class="px-4 py-3 font-semibold">NEDENİ</th>
+                            <th class="px-4 py-3 font-semibold">AÇILIŞ</th>
+                            <th class="px-4 py-3 font-semibold">KAPANIŞ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesTable" class="divide-y divide-white/5">
+                        <tr>
+                            <td colspan="10" class="py-12 text-center text-slate-500 italic">
+                                <div class="flex flex-col items-center gap-3">
+                                    <i data-lucide="clock" class="w-12 h-12 stroke-1 text-slate-700"></i>
+                                    <span class="text-sm">Henüz kapanmış işlem kaydı yok</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Sayfalandırma -->
+            <div id="tradesPagination" class="hidden flex items-center justify-between mt-4 pt-3 border-t border-white/10">
+                <span class="text-xs text-slate-400 font-mono" id="tradesPageInfo">1-15 / 0 işlem</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="tradesPagePrev()" id="tradesPrevBtn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-indigo-600/30 text-slate-300 hover:text-white text-xs font-mono transition-colors" disabled>◀ Önceki</button>
+                    <span class="text-xs font-mono text-slate-400 px-2" id="tradesPageNum">1/1</span>
+                    <button onclick="tradesPageNext()" id="tradesNextBtn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-indigo-600/30 text-slate-300 hover:text-white text-xs font-mono transition-colors">Sonraki ▶</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🐋 Canlı Emir Defteri & Balina Radarı (Order Book Depth & Whale Walls) -->
+        <div class="glass-panel rounded-2xl p-5 border border-cyan-500/20 shadow-2xl shadow-cyan-500/5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        <i data-lucide="waves" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm tracking-wide text-white uppercase flex items-center gap-2">
+                            <span>Canlı Emir Defteri & Balina Radarı</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30 animate-pulse">CANLI DERİNLİK</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Binance Vadeli Tahtası: Anlık Alıcı/Satıcı Hacmi, Balina Duvarları ve Tahta Üstünlüğü</p>
+                    </div>
+                </div>
+                <button onclick="fetchOrderbookRadar()" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-mono flex items-center gap-1.5 border border-white/10 transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span>Tahtayı Yenile</span>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead>
+                        <tr class="border-b border-white/10 text-slate-400">
+                            <th class="pb-3 font-semibold">PARİTE</th>
+                            <th class="pb-3 font-semibold">FİYAT</th>
+                            <th class="pb-3 font-semibold">TAHTA GÜÇ DENGESİ (ALIŞ / SATIŞ)</th>
+                            <th class="pb-3 font-semibold">TOPLAM ALIŞ / SATIŞ ($)</th>
+                            <th class="pb-3 font-semibold">BALİNA DUVARI 🐋</th>
+                            <th class="pb-3 font-semibold">TAHTA SİNYALİ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderbookTable" class="divide-y divide-white/5">
+                        <tr>
+                            <td colspan="6" class="py-10 text-center text-slate-500 italic">
+                                <div class="flex flex-col items-center gap-2">
+                                    <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-cyan-400"></i>
+                                    <span>Borsa tahta derinliği taranıyor...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- AI Radarı & 20 Parite Modalı -->
@@ -386,7 +463,7 @@
                 <div class="p-5 border-b border-white/10 flex items-center justify-between bg-purple-950/20">
                     <div class="flex items-center gap-2">
                         <i data-lucide="radar" class="w-5 h-5 text-purple-400"></i>
-                        <h3 class="font-bold text-base text-white tracking-wide">AI RADARI — TAKİP EDİLEN 20 LİKİT PARİTE</h3>
+                        <h3 class="font-bold text-base text-white tracking-wide">AI RADARI — TAKİP EDİLEN <span id="radarSymbolCount">—</span> LİKİT PARİTE</h3>
                     </div>
                     <button onclick="closeRadarModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
                         <i data-lucide="x" class="w-5 h-5"></i>
@@ -394,7 +471,7 @@
                 </div>
                 <div class="p-5 overflow-y-auto space-y-4">
                     <p class="text-xs text-slate-300">
-                        Bot 24 saatlik hacmi en yüksek 20 pariteyi sürekli tarar, EMA, RSI, MACD ve Random Forest ML modeli ile her mumda 0-100 arası AI skoru üretir.
+                        Bot 24 saatlik hacmi en yüksek <span id="radarSymbolCount2">—</span> pariteyi sürekli tarar, EMA, RSI, MACD ve Random Forest ML modeli ile her mumda 0-100 arası AI skoru üretir.
                     </p>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs font-mono">
@@ -443,6 +520,42 @@
             </div>
         </div>
 
+        <!-- Günlük İstatistik & PnL Rapor Modalı -->
+        <div id="statsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+            <div class="glass-panel w-full max-w-3xl max-h-[88vh] rounded-2xl border border-emerald-500/30 flex flex-col shadow-2xl shadow-emerald-500/10 overflow-hidden">
+                <div class="p-5 border-b border-white/10 flex items-center justify-between bg-emerald-950/20">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="bar-chart-2" class="w-5 h-5 text-emerald-400"></i>
+                        <h3 class="font-bold text-base text-white tracking-wide">BUGÜNKÜ DETAYLI KÂR / ZARAR RAPORU</h3>
+                    </div>
+                    <button onclick="closeStatsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-4 font-mono text-xs" id="modalStatsBody">
+                    <!-- Dinamik doldurulacak -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Kapanan İşlem Detay Modalı -->
+        <div id="tradeDetailModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+            <div class="glass-panel w-full max-w-lg rounded-2xl border border-indigo-500/30 flex flex-col shadow-2xl shadow-indigo-500/10 overflow-hidden">
+                <div class="p-5 border-b border-white/10 flex items-center justify-between bg-indigo-950/20">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="history" class="w-5 h-5 text-indigo-400"></i>
+                        <h3 class="font-bold text-base text-white tracking-wide" id="tradeModalTitle">KAPANAN İŞLEM DETAYI</h3>
+                    </div>
+                    <button onclick="closeTradeDetailModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-4 font-mono text-xs" id="tradeModalBody">
+                    <!-- Dinamik doldurulacak -->
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <footer class="border-t border-white/5 py-4 px-6 text-center text-xs text-slate-500 font-mono mt-auto">
@@ -452,7 +565,7 @@
     <script>
         lucide.createIcons();
 
-        const WS_URL = `ws://${location.host}/ws`;
+        const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
         let ws = null;
         let reconnectDelay = 2000;
         let currentPositionsData = [];
@@ -604,9 +717,9 @@
                     const rsi = sig && sig.rsi ? sig.rsi.toFixed(1) : '—';
                     const regime = sig && sig.regime ? sig.regime : '—';
 
-                    let dirBadge = `<span class="px-2 py-0.5 rounded bg-white/5 text-slate-400">NÖTR</span>`;
-                    if (dir === 'LONG') dirBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">🟢 LONG</span>`;
-                    else if (dir === 'SHORT') dirBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold">🔴 SHORT</span>`;
+                    let dirBadge = `<span class="px-2 py-0.5 rounded bg-white/5 text-slate-400 font-mono">NÖTR</span>`;
+                    if (dir === 'LONG') dirBadge = `<span class="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white font-extrabold text-[11px] shadow-sm">LONG</span>`;
+                    else if (dir === 'SHORT') dirBadge = `<span class="px-2.5 py-0.5 rounded-md bg-[#881337] text-white font-extrabold border border-rose-800 text-[11px] shadow-sm">SHORT</span>`;
 
                     return `
                         <tr class="hover:bg-white/[0.04] transition-colors">
@@ -655,7 +768,7 @@
 
         async function fetchTrades() {
             try {
-                const r = await fetch('/api/trades?limit=15');
+                const r = await fetch('/api/trades?limit=200');
                 const data = await r.json();
                 renderTrades(data);
             } catch(e) {}
@@ -663,11 +776,20 @@
 
         function updateStatusCards(d) {
             const bal = d.balance_usdt ? parseFloat(d.balance_usdt) : 0;
+            const wbal = d.wallet_balance !== undefined ? parseFloat(d.wallet_balance) : bal;
+            const unpnl = d.unrealized_pnl !== undefined ? parseFloat(d.unrealized_pnl) : (bal - wbal);
             let balDisplay = '0.0000';
             if (bal > 0) {
                 balDisplay = bal < 1 ? bal.toFixed(6) : bal.toFixed(4);
             }
             document.getElementById('balance').textContent = balDisplay;
+
+            const balSub = document.getElementById('balanceSubtext');
+            if (balSub) {
+                const unSign = unpnl >= 0 ? '+' : '';
+                const unColor = unpnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                balSub.innerHTML = `Cüzdan: <b>${wbal.toFixed(2)}$</b> | Açık Kâr: <b class="${unColor}">${unSign}${unpnl.toFixed(2)}$</b>`;
+            }
             
             const pnl = parseFloat(d.daily_pnl || 0);
             const pnlEl = document.getElementById('dailyPnl');
@@ -675,93 +797,535 @@
             pnlEl.className = 'text-3xl font-extrabold font-mono tracking-tight ' + (pnl >= 0 ? 'text-emerald-400' : 'text-rose-400');
             
             document.getElementById('openPos').textContent = d.open_positions ?? 0;
-            document.getElementById('posCountText').textContent = `${d.open_positions ?? 0} Aktif (Tıkla ve İncele)`;
-            document.getElementById('symbols').textContent = d.symbols_tracked > 0 ? d.symbols_tracked : 20;
+            const posCountEl = document.getElementById('posCountText');
+            if (posCountEl) {
+                posCountEl.textContent = `${d.open_positions ?? 0} Aktif (Tıkla ve İncele)`;
+            }
+            const symCount = d.symbols_tracked > 0 ? d.symbols_tracked : (d.symbols_list ? d.symbols_list.length : '—');
+            document.getElementById('symbols').textContent = symCount;
+            const rsc1 = document.getElementById('radarSymbolCount');
+            if (rsc1) rsc1.textContent = symCount;
+            const rsc2 = document.getElementById('radarSymbolCount2');
+            if (rsc2) rsc2.textContent = symCount;
 
             document.getElementById('lastUpdate').textContent = 'Son: ' + new Date().toLocaleTimeString('tr-TR');
         }
 
+        function fmtDateFull(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso.includes('Z') ? iso : iso + 'Z');
+            return d.toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        }
+
         function renderPositions(data) {
-            const tbody = document.getElementById('positionsTable');
+            const grid = document.getElementById('positionsGrid');
+            document.getElementById('posCountText').textContent =
+                `${data.length} Aktif — Karta Basınca Grafiği Değiştirir`;
+
             if (!data.length) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="py-10 text-center text-slate-500 italic">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="inbox" class="w-8 h-8 stroke-1 text-slate-600"></i>
-                                <span>Şu an açık pozisyon bulunmuyor</span>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                grid.innerHTML = `
+                    <div class="col-span-full py-14 text-center text-slate-500 italic">
+                        <div class="flex flex-col items-center gap-3">
+                            <i data-lucide="inbox" class="w-12 h-12 stroke-1 text-slate-700"></i>
+                            <span class="text-sm font-semibold">Şu an açık pozisyon bulunmuyor</span>
+                            <span class="text-xs text-slate-600">Bot güçlü sinyal bekliyor (min skor: 40)</span>
+                        </div>
+                    </div>`;
                 lucide.createIcons();
                 return;
             }
-            tbody.innerHTML = data.map((t, idx) => {
+
+            grid.innerHTML = data.map((t, idx) => {
+                const isLong = t.side === 'LONG';
+                const pnl = parseFloat(t.live_pnl || 0);
+                const pnlPct = parseFloat(t.live_pnl_pct || 0);
+                const isProfit = pnl >= 0;
+                const pnlSign = isProfit ? '+' : '';
+                const qty = parseFloat(t.quantity || 0);
+                const entry = parseFloat(t.entry_price || 0);
+                const sl = parseFloat(t.sl_price || 0);
+                const tp = parseFloat(t.tp_price || 0);
+                const lev = parseInt(t.leverage || 8);
+                const notional = qty * entry;
+                const margin = notional / lev;
+                const slDist = entry > 0 && sl > 0 ? (Math.abs(entry - sl) / entry * 100).toFixed(2) : '—';
+                const tpDist = entry > 0 && tp > 0 ? (Math.abs(tp - entry) / entry * 100).toFixed(2) : '—';
+                const score = t.signal_score ? t.signal_score.toFixed(1) : '—';
+                const openTime = fmtDateFull(t.opened_at);
+                const markPrice = t.mark_price ? parseFloat(t.mark_price) : entry;
+
+                // PnL bar hesabı (0-100%)
+                const pnlBarPct = Math.min(100, Math.abs(pnlPct) * 5); // 20% pnl = full bar
+
+                // Kart rengi: Long = yeşil kenar, Short = kırmızı kenar
+                const cardBorder = isLong ? 'border-emerald-500/30 hover:border-emerald-400/60' : 'border-rose-700/40 hover:border-rose-500/60';
+                const cardGlow = isLong ? 'shadow-emerald-500/5' : 'shadow-rose-500/5';
+                const headerBg = isLong ? 'from-emerald-950/60 to-transparent' : 'from-rose-950/60 to-transparent';
+                const sideBadge = isLong
+                    ? '<span class="px-3 py-1 rounded-lg bg-emerald-600 text-white font-extrabold text-xs tracking-wider shadow-lg shadow-emerald-900/50">↑ LONG</span>'
+                    : '<span class="px-3 py-1 rounded-lg bg-[#881337] text-white font-extrabold text-xs tracking-wider border border-rose-700 shadow-lg shadow-rose-950/60">↓ SHORT</span>';
+                const pnlBgClass = isProfit ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/15 border-rose-500/30 text-rose-300';
+                const pnlBarColor = isProfit ? 'bg-emerald-500' : 'bg-rose-500';
+                const regime = t.regime || '—';
+
+                return `
+                    <div onclick="(function(){changeChartSymbol('${t.symbol}'); window.scrollTo({top:0,behavior:'smooth'});})()" 
+                         class="glass-panel rounded-2xl border ${cardBorder} shadow-xl ${cardGlow} cursor-pointer transition-all duration-300 hover:scale-[1.01] overflow-hidden group">
+                        
+                        <!-- Kart Başlığı -->
+                        <div class="bg-gradient-to-b ${headerBg} p-4 pb-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl ${isLong ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-rose-800/30 border border-rose-700/40'} flex items-center justify-center font-bold text-sm font-mono ${isLong ? 'text-emerald-400' : 'text-rose-400'}">
+                                    ${t.symbol.replace('USDT','').substring(0,4)}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-white text-sm">${t.symbol}</div>
+                                    <div class="text-xs text-slate-400 font-mono">${openTime}</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-1">
+                                ${sideBadge}
+                                <span class="text-[10px] font-mono text-slate-400">${lev}x Kaldıraç</span>
+                            </div>
+                        </div>
+
+                        <!-- PnL Banner -->
+                        <div class="mx-4 mb-3 px-4 py-3 rounded-xl border ${pnlBgClass} flex items-center justify-between">
+                            <div>
+                                <div class="text-[10px] text-slate-400 mb-0.5">Canlı Kâr / Zarar</div>
+                                <div class="text-xl font-extrabold font-mono">${pnlSign}${pnl.toFixed(4)} $</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-extrabold font-mono">${pnlSign}${pnlPct.toFixed(2)}%</div>
+                                <div class="w-24 h-1.5 rounded-full bg-white/10 mt-1 overflow-hidden">
+                                    <div class="${pnlBarColor} h-full rounded-full transition-all" style="width:${pnlBarPct}%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detay Satırları -->
+                        <div class="px-4 pb-4 space-y-2 text-xs font-mono">
+                            <div class="grid grid-cols-3 gap-2">
+                                <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-slate-500 text-[10px] mb-0.5">GİRİŞ</div>
+                                    <div class="text-slate-200 font-bold">${fmt(entry, entry > 10 ? 4 : 6)}</div>
+                                </div>
+                                <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-slate-500 text-[10px] mb-0.5">MARK</div>
+                                    <div class="text-cyan-300 font-bold">${fmt(markPrice, markPrice > 10 ? 4 : 6)}</div>
+                                </div>
+                                <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-slate-500 text-[10px] mb-0.5">AI SKOR</div>
+                                    <div class="text-indigo-400 font-bold">${score}</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="p-2 rounded-lg bg-rose-500/5 border border-rose-500/20">
+                                    <div class="text-rose-400 text-[10px] mb-0.5">STOP LOSS</div>
+                                    <div class="text-rose-300 font-bold">${fmt(sl, sl > 10 ? 4 : 6)}</div>
+                                    <div class="text-[10px] text-slate-500">%${slDist} uzaklık</div>
+                                </div>
+                                <div class="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                                    <div class="text-emerald-400 text-[10px] mb-0.5">TAKE PROFIT</div>
+                                    <div class="text-emerald-300 font-bold">${fmt(tp, tp > 10 ? 4 : 6)}</div>
+                                    <div class="text-[10px] text-slate-500">%${tpDist} uzaklık</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between pt-1 border-t border-white/5">
+                                <div class="text-slate-500 text-[10px]">Notional: <span class="text-slate-300 font-bold">${notional.toFixed(2)} $</span> | Marjin: <span class="text-indigo-300 font-bold">${margin.toFixed(2)} $</span></div>
+                                <div class="text-[10px] text-slate-500">Rejim: <span class="text-amber-400">${regime}</span></div>
+                            </div>
+                            <div class="text-[10px] text-center text-slate-600 group-hover:text-indigo-400 transition-colors">
+                                📊 Grafikte Aç →
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        let currentClosedTradesData = [];
+        let tradesCurrentPage = 1;
+
+        function renderTrades(data) {
+            const closed = data.filter(t => t.status === 'CLOSED');
+            currentClosedTradesData = closed;
+            tradesCurrentPage = 1;
+
+            // Özet rozetleri güncelle
+            const wins = closed.filter(t => parseFloat(t.pnl || 0) > 0);
+            const losses = closed.filter(t => parseFloat(t.pnl || 0) <= 0);
+            if (closed.length > 0) {
+                document.getElementById('tradesSummaryBadges').classList.remove('hidden');
+                document.getElementById('tradesWinBadge').textContent = `✓ ${wins.length} Kâr`;
+                document.getElementById('tradesLossBadge').textContent = `✗ ${losses.length} Zarar`;
+                document.getElementById('tradesCountLabel').textContent = 
+                    `Toplam ${closed.length} İşlem — Net: ${wins.length} kâr / ${losses.length} zarar`;
+            }
+
+            renderTradesPage();
+        }
+
+        function renderTradesPage() {
+            const tbody = document.getElementById('tradesTable');
+            const closed = currentClosedTradesData;
+            const perPage = parseInt(document.getElementById('tradesPerPageSelect').value) || 15;
+            const totalPages = Math.max(1, Math.ceil(closed.length / perPage));
+            tradesCurrentPage = Math.min(tradesCurrentPage, totalPages);
+            const start = (tradesCurrentPage - 1) * perPage;
+            const end = Math.min(start + perPage, closed.length);
+            const page = closed.slice(start, end);
+
+            // Sayfalandırma UI
+            const pagination = document.getElementById('tradesPagination');
+            if (closed.length > perPage) {
+                pagination.classList.remove('hidden');
+                document.getElementById('tradesPageInfo').textContent = `${start + 1}–${end} / ${closed.length} işlem`;
+                document.getElementById('tradesPageNum').textContent = `${tradesCurrentPage} / ${totalPages}`;
+                document.getElementById('tradesPrevBtn').disabled = tradesCurrentPage <= 1;
+                document.getElementById('tradesNextBtn').disabled = tradesCurrentPage >= totalPages;
+            } else {
+                pagination.classList.add('hidden');
+            }
+
+            if (!closed.length) {
+                tbody.innerHTML = `
+                    <tr><td colspan="10" class="py-12 text-center text-slate-500 italic">
+                        <div class="flex flex-col items-center gap-3">
+                            <i data-lucide="clock" class="w-12 h-12 stroke-1 text-slate-700"></i>
+                            <span class="text-sm">Henüz kapanmış işlem kaydı yok</span>
+                        </div>
+                    </td></tr>`;
+                lucide.createIcons();
+                return;
+            }
+
+            tbody.innerHTML = page.map((t, i) => {
+                const globalIdx = start + i;
                 const isLong = t.side === 'LONG';
                 const sideBadge = isLong
-                    ? '<span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">LONG</span>'
-                    : '<span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold">SHORT</span>';
-                
+                    ? '<span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-extrabold text-[10px]">↑ LONG</span>'
+                    : '<span class="px-2 py-0.5 rounded-md bg-[#881337] text-white font-extrabold border border-rose-800 text-[10px]">↓ SHORT</span>';
+                const pnl = parseFloat(t.pnl || 0);
+                const pnlPct = parseFloat(t.pnl_pct || 0);
+                const isProfit = pnl >= 0;
+                const pnlClass = isProfit ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+                const pnlSign = isProfit ? '+' : '';
+                const rowBg = isProfit ? 'hover:bg-emerald-500/5' : 'hover:bg-rose-500/5';
+
+                let reasonBadge = `<span class="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[10px]">${t.close_reason || 'MANUAL'}</span>`;
+                if (t.close_reason === 'TP') reasonBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/20">✓ TAKE PROFIT</span>`;
+                else if (t.close_reason === 'SL') reasonBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/20">✗ STOP LOSS</span>`;
+                else if (t.close_reason === 'TRAILING') reasonBadge = `<span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold border border-indigo-500/20">⟳ TRAILING</span>`;
+                else if (t.close_reason === 'SYNC') reasonBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">SENKRON</span>`;
+
+                const ep = parseFloat(t.entry_price || 0);
+                const ep_d = ep > 10 ? 4 : 6;
+                const cp = t.close_price || t.exit_price;
+                const cp_d = cp && parseFloat(cp) > 10 ? 4 : 6;
+
                 return `
-                    <tr onclick="openPositionDetail(${idx})" class="hover:bg-indigo-500/10 cursor-pointer transition-colors group" title="Detayları görmek için tıkla">
-                        <td class="py-3 font-bold text-white flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full ${isLong ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
-                            <span>${t.symbol}</span>
-                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-white/5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">Detay ➔</span>
+                    <tr onclick="openTradeDetailModal(${globalIdx})" 
+                        class="cursor-pointer transition-colors ${rowBg} group border-b border-white/[0.04]">
+                        <td class="px-4 py-2.5 text-slate-600 font-mono">${closed.length - globalIdx}</td>
+                        <td class="px-4 py-2.5 font-bold text-white">
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full ${isProfit ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
+                                ${t.symbol}
+                            </span>
                         </td>
-                        <td class="py-3">${sideBadge}</td>
-                        <td class="py-3 text-slate-200 font-mono">${fmt(t.entry_price)}</td>
-                        <td class="py-3 text-rose-400 font-mono">${fmt(t.sl_price)}</td>
-                        <td class="py-3 text-emerald-400 font-mono">${fmt(t.tp_price)}</td>
-                        <td class="py-3 font-mono font-bold text-indigo-400">${t.signal_score ? t.signal_score.toFixed(1) : '—'}</td>
+                        <td class="px-4 py-2.5">${sideBadge}</td>
+                        <td class="px-4 py-2.5 text-slate-300 font-mono">${ep > 0 ? ep.toFixed(ep_d) : '—'}</td>
+                        <td class="px-4 py-2.5 font-mono ${cp ? 'text-slate-200' : 'text-slate-500'}">${cp ? parseFloat(cp).toFixed(cp_d) : '—'}</td>
+                        <td class="px-4 py-2.5 font-mono ${pnlClass}">${pnlSign}${pnl.toFixed(4)} $</td>
+                        <td class="px-4 py-2.5 font-mono ${pnlClass}">${pnlSign}${pnlPct.toFixed(2)}%</td>
+                        <td class="px-4 py-2.5">${reasonBadge}</td>
+                        <td class="px-4 py-2.5 text-slate-500 font-mono text-[11px]">${fmtDateFull(t.opened_at)}</td>
+                        <td class="px-4 py-2.5 text-slate-400 font-mono text-[11px]">${fmtDateFull(t.closed_at)}</td>
                     </tr>
                 `;
             }).join('');
             lucide.createIcons();
         }
 
-        function renderTrades(data) {
-            const tbody = document.getElementById('tradesTable');
-            const closed = data.filter(t => t.status === 'CLOSED');
-            if (!closed.length) {
+        function tradesPagePrev() { if (tradesCurrentPage > 1) { tradesCurrentPage--; renderTradesPage(); } }
+        function tradesPageNext() {
+            const perPage = parseInt(document.getElementById('tradesPerPageSelect').value) || 15;
+            const total = Math.ceil(currentClosedTradesData.length / perPage);
+            if (tradesCurrentPage < total) { tradesCurrentPage++; renderTradesPage(); }
+        }
+
+
+        // ── 🐋 Canlı Emir Defteri & Balina Radarı ─────────────────────────
+        async function fetchOrderbookRadar() {
+            try {
+                const res = await fetch('/api/orderbook-radar');
+                if (!res.ok) return;
+                const data = await res.json();
+                renderOrderbookRadar(data);
+            } catch(e) {
+                console.warn('Orderbook radar fetch error:', e);
+            }
+        }
+
+        function renderOrderbookRadar(data) {
+            const tbody = document.getElementById('orderbookTable');
+            if (!data || !data.length) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="py-10 text-center text-slate-500 italic">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="clock" class="w-8 h-8 stroke-1 text-slate-600"></i>
-                                <span>Henüz kapanmış işlem kaydı yok</span>
-                            </div>
+                        <td colspan="6" class="py-10 text-center text-slate-500 italic">
+                            <span>Tahta verisi henüz hazır değil, bekleniyor...</span>
                         </td>
                     </tr>
                 `;
-                lucide.createIcons();
                 return;
             }
-            tbody.innerHTML = closed.map(t => {
-                const isLong = t.side === 'LONG';
-                const sideBadge = isLong
-                    ? '<span class="text-emerald-400 font-semibold">LONG</span>'
-                    : '<span class="text-rose-400 font-semibold">SHORT</span>';
 
-                let reasonBadge = `<span class="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[10px]">${t.close_reason || 'MANUAL'}</span>`;
-                if (t.close_reason === 'TP') {
-                    reasonBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">KÂR AL (TP)</span>`;
-                } else if (t.close_reason === 'SL') {
-                    reasonBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">STOP (SL)</span>`;
+            tbody.innerHTML = data.map(item => {
+                const isBull = item.bias === 'BULLISH';
+                const isBear = item.bias === 'BEARISH';
+                
+                // Alış / Satış Güç Barı
+                const imb = item.imbalance; // -1 ile +1 arası
+                const bidPct = Math.round((imb + 1) / 2 * 100);
+                const askPct = 100 - bidPct;
+
+                // Balina Duvarı Rozeti
+                let wallBadge = '<span class="text-slate-500 text-[11px]">—</span>';
+                if (item.has_bid_wall) {
+                    wallBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1 w-fit">
+                        <span>🐋 Alış Duvarı:</span>
+                        <span class="font-mono text-white">${item.bid_wall_price}</span>
+                    </span>`;
+                } else if (item.has_ask_wall) {
+                    wallBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 flex items-center gap-1 w-fit">
+                        <span>🐋 Satış Duvarı:</span>
+                        <span class="font-mono text-white">${item.ask_wall_price}</span>
+                    </span>`;
+                }
+
+                // Tahta Sinyali
+                let biasBadge = '<span class="px-2 py-0.5 rounded bg-slate-500/10 text-slate-400">DENGELİ</span>';
+                if (isBull) {
+                    biasBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">ALICI BASKISI (%${item.imbalance_pct > 0 ? '+' : ''}${item.imbalance_pct})</span>`;
+                } else if (isBear) {
+                    biasBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold">SATICI BASKISI (%${item.imbalance_pct})</span>`;
                 }
 
                 return `
-                    <tr class="hover:bg-white/[0.02] transition-colors">
-                        <td class="py-3 font-bold text-white">${t.symbol}</td>
-                        <td class="py-3">${sideBadge}</td>
-                        <td class="py-3 font-mono">${fmtPnl(t.pnl)}</td>
-                        <td class="py-3">${reasonBadge}</td>
-                        <td class="py-3 text-slate-400 font-mono text-[11px]">${fmtDate(t.closed_at)}</td>
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="py-3 font-bold text-white flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full ${isBull ? 'bg-emerald-400' : isBear ? 'bg-rose-400' : 'bg-slate-400'}"></span>
+                            <span>${item.symbol}</span>
+                        </td>
+                        <td class="py-3 font-mono text-slate-200">${item.price}</td>
+                        <td class="py-3">
+                            <div class="w-48 bg-slate-800 rounded-full h-3 overflow-hidden flex border border-white/10" title="Alıcı: %${bidPct} | Satıcı: %${askPct}">
+                                <div class="bg-emerald-500 h-full transition-all duration-500" style="width: ${bidPct}%"></div>
+                                <div class="bg-rose-500 h-full transition-all duration-500" style="width: ${askPct}%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] text-slate-400 mt-1 font-mono w-48">
+                                <span class="text-emerald-400">Alış: %${bidPct}</span>
+                                <span class="text-rose-400">Satış: %${askPct}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 font-mono text-[11px]">
+                            <div class="text-emerald-400">$${(item.bid_vol/1000).toFixed(0)}k</div>
+                            <div class="text-rose-400">$${(item.ask_vol/1000).toFixed(0)}k</div>
+                        </td>
+                        <td class="py-3">${wallBadge}</td>
+                        <td class="py-3">${biasBadge}</td>
                     </tr>
                 `;
             }).join('');
             lucide.createIcons();
+        }
+
+        // ── Modallar ─────────────────────────────────────────────────────
+        async function openStatsModal() {
+            try {
+                const res = await fetch('/api/stats');
+                const s = await res.json();
+                const pnlVal = parseFloat(s.daily_pnl || 0);
+                const pnlClass = pnlVal >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const pnlSign = pnlVal >= 0 ? '+' : '';
+                const walletChange = parseFloat(s.wallet_change_pct || 0);
+                const walletClass = walletChange >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const walletSign = walletChange >= 0 ? '+' : '';
+
+                // Her bir işlemin detay tablosu
+                let tradesRows = '';
+                if (s.trades && s.trades.length > 0) {
+                    tradesRows = s.trades.map((t, idx) => {
+                        const tpnl = parseFloat(t.pnl || 0);
+                        const tpnlPct = parseFloat(t.pnl_pct || 0);
+                        const isWin = tpnl > 0;
+                        const tClass = isWin ? 'text-emerald-400' : 'text-rose-400';
+                        const tSign = isWin ? '+' : '';
+                        const isLong = t.side === 'LONG';
+                        const sideBadge = isLong
+                            ? '<span class="px-2 py-0.5 rounded bg-emerald-600/30 text-emerald-300 font-bold text-[10px]">LONG</span>'
+                            : '<span class="px-2 py-0.5 rounded bg-rose-800/40 text-rose-300 font-bold text-[10px]">SHORT</span>';
+
+                        const ep = parseFloat(t.entry_price || 0);
+                        const cp = t.close_price ? parseFloat(t.close_price) : null;
+                        const ep_d = ep > 10 ? 4 : 6;
+                        const cp_d = cp && cp > 10 ? 4 : 6;
+
+                        return `
+                            <tr class="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                                <td class="py-2 text-slate-500">${idx + 1}</td>
+                                <td class="py-2 font-bold text-white">${t.symbol}</td>
+                                <td class="py-2">${sideBadge}</td>
+                                <td class="py-2 text-slate-300">${ep > 0 ? ep.toFixed(ep_d) : '—'}</td>
+                                <td class="py-2 text-slate-300">${cp ? cp.toFixed(cp_d) : '—'}</td>
+                                <td class="py-2 font-bold ${tClass}">${tSign}${tpnl.toFixed(4)} $</td>
+                                <td class="py-2 font-bold ${tClass}">${tSign}${tpnlPct.toFixed(2)}%</td>
+                                <td class="py-2 text-slate-400 text-[10px]">${t.close_reason || '—'}</td>
+                                <td class="py-2 text-slate-500 text-[10px]">${t.closed_at ? fmtDateFull(t.closed_at) : '—'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    tradesRows = `<tr><td colspan="9" class="py-6 text-center text-slate-500 italic">Kayıtlı kapanan işlem bulunmuyor</td></tr>`;
+                }
+
+                document.getElementById('modalStatsBody').innerHTML = `
+                    <!-- Üst Kartlar: PnL, Win Rate, Kasa Durumu -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center">
+                            <div class="text-[11px] text-slate-400 mb-1 font-mono">24s Net Realized PnL</div>
+                            <div class="text-2xl font-extrabold font-mono ${pnlClass}">${pnlSign}${pnlVal.toFixed(4)} $</div>
+                            <div class="text-[10px] text-slate-500 mt-1">Toplam Brüt Kâr: <span class="text-emerald-400">+${s.total_profit || 0}$</span> | Zarar: <span class="text-rose-400">${s.total_loss || 0}$</span></div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center">
+                            <div class="text-[11px] text-slate-400 mb-1 font-mono">Win Rate (Kazanma Oranı)</div>
+                            <div class="text-2xl font-extrabold font-mono text-cyan-400">%${s.win_rate_pct || 0}</div>
+                            <div class="text-[10px] text-slate-400 mt-1">${s.win_count || 0} Başarılı / ${s.loss_count || 0} Başarısız</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center">
+                            <div class="text-[11px] text-slate-400 mb-1 font-mono">Kasa Yüzdelik Durumu</div>
+                            <div class="text-2xl font-extrabold font-mono ${walletClass}">${walletSign}${walletChange}%</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Güncel Kasa: <span class="text-white font-bold">${parseFloat(s.balance || 0).toFixed(4)} USDT</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Long vs Short Performans Dağılımı -->
+                    <div class="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/15 mb-4">
+                        <div class="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                            <span>POZİSYON YÖNÜ DAĞILIMI (LONG / SHORT)</span>
+                            <span class="text-[10px] font-mono text-slate-400">Toplam: ${s.closed_trades_today || 0} İşlem</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 font-mono text-xs">
+                            <div class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-emerald-400 font-bold">LONG İŞLEMLER</span>
+                                    <span class="text-white font-extrabold">${s.long_count || 0} Adet</span>
+                                </div>
+                                <div class="text-[11px] text-slate-300 flex justify-between">
+                                    <span>Kârlı: <b class="text-emerald-400">${s.long_wins || 0}</b></span>
+                                    <span>Zararlı: <b class="text-rose-400">${s.long_losses || 0}</b></span>
+                                    <span>Oran: <b class="text-cyan-300">%${s.long_count ? Math.round((s.long_wins||0)/s.long_count*100) : 0}</b></span>
+                                </div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-rose-400 font-bold">SHORT İŞLEMLER</span>
+                                    <span class="text-white font-extrabold">${s.short_count || 0} Adet</span>
+                                </div>
+                                <div class="text-[11px] text-slate-300 flex justify-between">
+                                    <span>Kârlı: <b class="text-emerald-400">${s.short_wins || 0}</b></span>
+                                    <span>Zararlı: <b class="text-rose-400">${s.short_losses || 0}</b></span>
+                                    <span>Oran: <b class="text-cyan-300">%${s.short_count ? Math.round((s.short_wins||0)/s.short_count*100) : 0}</b></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kapanan Tüm İşlemlerin Tek Tek Döküm Tablosu -->
+                    <div class="rounded-xl border border-white/5 overflow-hidden">
+                        <div class="p-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+                            <span class="font-bold text-xs text-white uppercase font-mono">Bütün Kapanan İşlemlerin Dökümü</span>
+                            <span class="text-[11px] text-slate-400 font-mono">${s.trades ? s.trades.length : 0} kayıt</span>
+                        </div>
+                        <div class="max-h-[300px] overflow-y-auto">
+                            <table class="w-full text-left text-xs font-mono">
+                                <thead class="bg-white/[0.04] sticky top-0 text-slate-400">
+                                    <tr class="border-b border-white/10">
+                                        <th class="py-2 px-3">#</th>
+                                        <th class="py-2">PARİTE</th>
+                                        <th class="py-2">YÖN</th>
+                                        <th class="py-2">GİRİŞ</th>
+                                        <th class="py-2">ÇIKIŞ</th>
+                                        <th class="py-2">NET K/Z</th>
+                                        <th class="py-2">% GETİRİ</th>
+                                        <th class="py-2">NEDEN</th>
+                                        <th class="py-2">KAPANIŞ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5 px-3">
+                                    ${tradesRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                const m = document.getElementById('statsModal');
+                m.classList.remove('hidden');
+                m.classList.add('flex');
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function closeStatsModal() {
+            const m = document.getElementById('statsModal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function openAllPositionsModal() {
+            // Açık pozisyonlar kartına basınca ilk pozisyonu veya radar modalını aç
+            if (currentPositionsData.length > 0) {
+                openPositionDetail(0);
+            } else {
+                alert("Şu an açık vadeli pozisyon bulunmuyor.");
+            }
+        }
+
+        function openTradeDetailModal(idx) {
+            const t = currentClosedTradesData[idx];
+            if (!t) return;
+            const pnl = parseFloat(t.pnl || 0);
+            const pnlPct = parseFloat(t.pnl_pct || 0);
+            const isProfit = pnl >= 0;
+            const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+
+            document.getElementById('tradeModalTitle').textContent = `${t.symbol} — ${t.side} Kapanış Raporu`;
+            document.getElementById('tradeModalBody').innerHTML = `
+                <div class="p-4 rounded-xl ${isProfit ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'} border text-center mb-3">
+                    <div class="text-xs text-slate-400 mb-1">Gerçekleşen Net Kâr / Zarar</div>
+                    <div class="text-2xl font-extrabold ${pnlClass}">${isProfit ? '+' : ''}${pnl.toFixed(4)} USDT (${isProfit ? '+' : ''}${pnlPct.toFixed(2)}%)</div>
+                </div>
+                <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2.5 text-xs">
+                    <div class="flex justify-between"><span class="text-slate-400">Giriş Fiyatı:</span><span class="text-white font-bold">${fmt(t.entry_price)}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Çıkış Fiyatı:</span><span class="text-white font-bold">${fmt(t.close_price || t.entry_price)}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Kaldıraç & Miktar:</span><span class="text-cyan-400 font-bold">${t.leverage || 7}x — ${t.quantity} Adet</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Kapanış Nedeni:</span><span class="text-indigo-300 font-bold">${t.close_reason || 'MANUAL'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Açılış Zamanı:</span><span class="text-slate-300">${t.opened_at ? new Date(t.opened_at).toLocaleString('tr-TR') : '—'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Kapanış Zamanı:</span><span class="text-slate-300">${t.closed_at ? new Date(t.closed_at).toLocaleString('tr-TR') : '—'}</span></div>
+                </div>
+            `;
+            const m = document.getElementById('tradeDetailModal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+
+        function closeTradeDetailModal() {
+            const m = document.getElementById('tradeDetailModal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
         }
 
         function connectWs() {
@@ -769,14 +1333,14 @@
                 ws = new WebSocket(WS_URL);
                 ws.onopen = () => {
                     reconnectDelay = 2000;
-                    fetchStatus(); fetchPositions(); fetchTrades();
+                    fetchStatus(); fetchPositions(); fetchTrades(); fetchOrderbookRadar();
                 };
                 ws.onmessage = (e) => {
                     try {
                         const msg = JSON.parse(e.data);
                         if (msg.type === 'status') updateStatusCards(msg.data);
-                        if (msg.type === 'position_update') fetchPositions();
-                        if (msg.type === 'trade_closed') { fetchTrades(); fetchStatus(); }
+                        if (msg.type === 'position_update') { fetchPositions(); fetchOrderbookRadar(); }
+                        if (msg.type === 'trade_closed') { fetchTrades(); fetchStatus(); fetchOrderbookRadar(); }
                     } catch(_) {}
                 };
                 ws.onclose = () => {
@@ -789,8 +1353,9 @@
             }
         }
 
-        setInterval(() => { fetchStatus(); fetchPositions(); fetchTrades(); }, 15000);
+        setInterval(() => { fetchStatus(); fetchPositions(); fetchTrades(); fetchOrderbookRadar(); }, 12000);
         connectWs();
+        fetchOrderbookRadar();
     </script>
 </body>
 </html>

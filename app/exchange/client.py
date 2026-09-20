@@ -223,19 +223,29 @@ class BinanceClient:
     # ── Hesap ────────────────────────────────────────────────────────────────
 
     async def get_balance_usdt(self) -> Decimal:
-        """Kullanılabilir USDT bakiyesi."""
+        """Kullanılabilir serbest USDT bakiyesi."""
         data = await self._request("GET", "/fapi/v2/balance", signed=True)
         for item in data:
             if item["asset"] == "USDT":
                 return Decimal(item["availableBalance"])
         raise RuntimeError("USDT bakiyesi bulunamadı")
 
-    async def get_total_balance_usdt(self) -> Decimal:
-        """Toplam USDT cüzdan bakiyesi (unrealized PnL dahil)."""
+    async def get_wallet_balance_usdt(self) -> Decimal:
+        """Cüzdandaki ana USDT bakiyesi (gerçekleşmiş)."""
         data = await self._request("GET", "/fapi/v2/balance", signed=True)
         for item in data:
             if item["asset"] == "USDT":
                 return Decimal(item["balance"])
+        raise RuntimeError("USDT bakiyesi bulunamadı")
+
+    async def get_total_balance_usdt(self) -> Decimal:
+        """Toplam USDT cüzdan değeri (unrealized PnL dahil net equity)."""
+        data = await self._request("GET", "/fapi/v2/balance", signed=True)
+        for item in data:
+            if item["asset"] == "USDT":
+                wallet_bal = Decimal(item.get("balance", "0"))
+                unpnl = Decimal(item.get("crossUnPnl", "0"))
+                return wallet_bal + unpnl
         raise RuntimeError("USDT bakiyesi bulunamadı")
 
     async def get_positions(self) -> List[Dict]:
@@ -274,6 +284,21 @@ class BinanceClient:
             "GET", "/fapi/v1/premiumIndex", params={"symbol": symbol}
         )
         return Decimal(data["markPrice"])
+
+    async def get_order_book(self, symbol: str, limit: int = 50) -> Dict:
+        """
+        Derinlik (Order Book / Tahta) verisi.
+        bids: [[price, qty], ...], asks: [[price, qty], ...]
+        """
+        return await self._request(
+            "GET", "/fapi/v1/depth", params={"symbol": symbol, "limit": limit}
+        )
+
+    async def get_book_ticker(self, symbol: str) -> Dict:
+        """En iyi anlık alış ve satış fiyat/miktarları."""
+        return await self._request(
+            "GET", "/fapi/v1/ticker/bookTicker", params={"symbol": symbol}
+        )
 
     # ── Ayarlar ───────────────────────────────────────────────────────────────
 
@@ -322,50 +347,73 @@ class BinanceClient:
         )
 
     async def place_stop_market(
-        self, symbol: str, side: str, stop_price: Decimal
+        self, symbol: str, side: str, stop_price: Decimal, quantity: Optional[Decimal] = None
     ) -> Dict:
         """
-        STOP_MARKET emri — tüm pozisyonu kapatır.
-        side: 'SELL' (long SL) veya 'BUY' (short SL)
-        closePosition=true → quantity belirtmeden tüm pozisyonu kapatır.
-        workingType=MARK_PRICE → mark price üzerinden tetiklenir (daha güvenli).
+        STOP_MARKET emri — pozisyonu korur.
+        Önce closePosition=true dener, -4120 dönerse reduceOnly=true ile dener.
         """
         pp = self.get_price_precision(symbol)
-        return await self._request(
-            "POST",
-            "/fapi/v1/order",
-            params={
+        qp = self.get_qty_precision(symbol)
+
+        try:
+            params = {
                 "symbol": symbol,
                 "side": side,
                 "type": "STOP_MARKET",
                 "stopPrice": f"{stop_price:.{pp}f}",
                 "closePosition": "true",
                 "workingType": "MARK_PRICE",
-            },
-            signed=True,
-        )
+            }
+            return await self._request("POST", "/fapi/v1/order", params=params, signed=True)
+        except Exception as exc:
+            if "-4120" in str(exc) and quantity is not None:
+                # Multi-Asset veya Algo kısıtlaması -> reduceOnly ile dene
+                logger.info(f"[{symbol}] STOP_MARKET closePosition başarısız, reduceOnly deneniyor...")
+                params = {
+                    "symbol": symbol,
+                    "side": side,
+                    "type": "STOP_MARKET",
+                    "stopPrice": f"{stop_price:.{pp}f}",
+                    "quantity": f"{quantity:.{qp}f}",
+                    "reduceOnly": "true",
+                    "workingType": "MARK_PRICE",
+                }
+                return await self._request("POST", "/fapi/v1/order", params=params, signed=True)
+            raise
 
     async def place_take_profit_market(
-        self, symbol: str, side: str, stop_price: Decimal
+        self, symbol: str, side: str, stop_price: Decimal, quantity: Optional[Decimal] = None
     ) -> Dict:
         """
-        TAKE_PROFIT_MARKET emri — tüm pozisyonu kapatır.
-        side: 'SELL' (long TP) veya 'BUY' (short TP)
+        TAKE_PROFIT_MARKET emri.
         """
         pp = self.get_price_precision(symbol)
-        return await self._request(
-            "POST",
-            "/fapi/v1/order",
-            params={
+        qp = self.get_qty_precision(symbol)
+
+        try:
+            params = {
                 "symbol": symbol,
                 "side": side,
                 "type": "TAKE_PROFIT_MARKET",
                 "stopPrice": f"{stop_price:.{pp}f}",
                 "closePosition": "true",
                 "workingType": "MARK_PRICE",
-            },
-            signed=True,
-        )
+            }
+            return await self._request("POST", "/fapi/v1/order", params=params, signed=True)
+        except Exception as exc:
+            if "-4120" in str(exc) and quantity is not None:
+                params = {
+                    "symbol": symbol,
+                    "side": side,
+                    "type": "TAKE_PROFIT_MARKET",
+                    "stopPrice": f"{stop_price:.{pp}f}",
+                    "quantity": f"{quantity:.{qp}f}",
+                    "reduceOnly": "true",
+                    "workingType": "MARK_PRICE",
+                }
+                return await self._request("POST", "/fapi/v1/order", params=params, signed=True)
+            raise
 
     async def close_position_market(self, symbol: str, side: str, quantity: Decimal) -> Dict:
         """

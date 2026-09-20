@@ -42,6 +42,7 @@ class OrderManager:
         # Aktif trailing stop high water marks
         self._trail_highs: Dict[str, Decimal] = {}   # symbol → best price
         self._trail_sl_orders: Dict[str, int] = {}   # symbol → sl_order_id
+        self._trade_types: Dict[str, str] = {}       # symbol → signal_type (COLLAPSE_SHORT, SUPER_LONG, etc.)
 
     # ── Pozisyon Açma ─────────────────────────────────────────────────────────
 
@@ -73,9 +74,14 @@ class OrderManager:
         # ── 1. Kaldıraç ve margin tipi ayarla ────────────────────────────────
         try:
             await self._client.set_isolated_margin(symbol)
+        except Exception as exc:
+            # -4168: Multi-Assets modunda izole marjin desteklenmez, bu normaldir
+            logger.warning(f"[{symbol}] Margin tipi ayarlanamadı (Multi-Asset modu aktif olabilir): {exc}")
+
+        try:
             await self._client.set_leverage(symbol, config.LEVERAGE)
         except Exception as exc:
-            logger.error(f"[{symbol}] Leverage/margin ayar hatası: {exc}")
+            logger.error(f"[{symbol}] Leverage ayar hatası: {exc}")
             return None
 
         # ── 2. Market order ───────────────────────────────────────────────────
@@ -109,25 +115,24 @@ class OrderManager:
         await asyncio.sleep(0.5)
 
         try:
-            sl_resp = await self._client.place_stop_market(symbol, sl_side, sl_price)
+            sl_resp = await self._client.place_stop_market(symbol, sl_side, sl_price, quantity=quantity)
             sl_order_id = str(sl_resp.get("orderId", ""))
             logger.info(f"PROTECTION {symbol} SL={sl_price:.4f} order_id={sl_order_id}")
         except Exception as exc:
-            logger.error(f"[{symbol}] SL yerleştirme BAŞARISIZ: {exc}. Pozisyon kapatılıyor!")
-            # SL yerleştirilemezse pozisyonu kapat — asla SL'siz bırakma
-            try:
-                close_side = "SELL" if direction == "LONG" else "BUY"
-                await self._client.close_position_market(symbol, close_side, quantity)
-            except Exception as close_exc:
-                logger.critical(f"[{symbol}] Pozisyon kapatma da başarısız: {close_exc}")
-            return None
+            logger.warning(
+                f"[{symbol}] Borsaya SL emri girilemedi ({exc}). "
+                f"Bot içi canlı Stop-Loss devrede (SL: {sl_price:.4f})"
+            )
 
         try:
-            tp_resp = await self._client.place_take_profit_market(symbol, tp_side, tp_price)
+            tp_resp = await self._client.place_take_profit_market(symbol, tp_side, tp_price, quantity=quantity)
             tp_order_id = str(tp_resp.get("orderId", ""))
             logger.info(f"PROTECTION {symbol} TP={tp_price:.4f} order_id={tp_order_id}")
         except Exception as exc:
-            logger.warning(f"[{symbol}] TP yerleştirme hatası (SL var): {exc}")
+            logger.warning(
+                f"[{symbol}] Borsaya TP emri girilemedi ({exc}). "
+                f"Bot içi canlı Take-Profit devrede (TP: {tp_price:.4f})"
+            )
 
         # ── 4. DB'ye kaydet ───────────────────────────────────────────────────
         trade = Trade(
@@ -151,6 +156,7 @@ class OrderManager:
 
         if config.TRAILING_STOP:
             self._trail_highs[symbol] = fill_price
+        self._trade_types[symbol] = signal.signal_type
 
         return trade
 
@@ -246,6 +252,7 @@ class OrderManager:
         # Trailing stop temizle
         self._trail_highs.pop(trade.symbol, None)
         self._trail_sl_orders.pop(trade.symbol, None)
+        self._trade_types.pop(trade.symbol, None)
 
         if self.on_close:
             try:
@@ -276,25 +283,89 @@ class OrderManager:
                     continue
 
                 direction = trade.side  # LONG / SHORT
-                best = self._trail_highs.get(symbol, mark_price)
+                close_side = "SELL" if direction == "LONG" else "BUY"
 
-                if direction == "LONG":
-                    if mark_price > best:
-                        self._trail_highs[symbol] = mark_price
-                        new_sl = mark_price - Decimal(str(
-                            float(trade.entry_price) * 0.01  # %1 trailing
-                        ))
-                        new_sl = max(new_sl, trade.sl_price)  # SL'yi asla düşürme
+                # ── Bot İçi SL / TP Tetiklenme Kontrolü ───────────────────────
+                hit_sl = (direction == "LONG" and mark_price <= trade.sl_price) or (direction == "SHORT" and mark_price >= trade.sl_price)
+                hit_tp = (direction == "LONG" and mark_price >= trade.tp_price) or (direction == "SHORT" and mark_price <= trade.tp_price)
+
+                if hit_sl or hit_tp:
+                    reason = "TP" if hit_tp else "SL"
+                    logger.info(f"[{symbol}] Hedef seviyeye ulaşıldı ({reason}) mark={mark_price} -> Pozisyon kapatılıyor")
+                    try:
+                        await self._client.close_position_market(symbol, close_side, trade.quantity)
+                        pnl = (mark_price - trade.entry_price) * trade.quantity if direction == "LONG" else (trade.entry_price - mark_price) * trade.quantity
+                        await self._close_trade(trade, reason, mark_price, pnl)
+                        continue
+                    except Exception as close_exc:
+                        logger.error(f"[{symbol}] Pozisyon kapatma hatası: {close_exc}")
+
+                # ── KÂR YÜZDESİ HESABI ───────────────────────────────────────
+                entry_p = trade.entry_price
+                if entry_p <= 0:
+                    continue
+
+                profit_pct = (
+                    ((mark_price - entry_p) / entry_p * Decimal("100"))
+                    if direction == "LONG"
+                    else ((entry_p - mark_price) / entry_p * Decimal("100"))
+                )
+
+                sig_type = self._trade_types.get(
+                    symbol, "COLLAPSE_SHORT" if direction == "SHORT" else "NORMAL"
+                )
+                is_macro = sig_type in ("COLLAPSE_SHORT", "SUPER_LONG")
+
+                # ── 1. BREAK-EVEN KİLİTLEME (RİSKSİZ İŞLEM) ────────────────────
+                be_sl = None
+                be_thresh = Decimal("3.0") if is_macro else Decimal("1.2")
+                if profit_pct >= be_thresh:
+                    if direction == "LONG":
+                        lock_mult = Decimal("1.010") if is_macro else Decimal("1.002")
+                        target_be = self._client.round_price(symbol, entry_p * lock_mult)
+                        if trade.sl_price < target_be:
+                            be_sl = target_be
+                    else:  # SHORT
+                        lock_mult = Decimal("0.990") if is_macro else Decimal("0.998")
+                        target_be = self._client.round_price(symbol, entry_p * lock_mult)
+                        if trade.sl_price > target_be:
+                            be_sl = target_be
+
+                if be_sl:
+                    tag = f"MAKRO {sig_type}" if is_macro else "GÜN İÇİ"
+                    logger.info(
+                        f"[{symbol}] {tag} BREAK-EVEN KİLİTLENDİ (Kâr=+%{profit_pct:.2f}) -> Risksiz trend sürüşü! Yeni SL={be_sl}"
+                    )
+                    await self._update_sl(trade, be_sl)
+
+                # ── 2. DİNAMİK TREND TRAILING STOP (BÜYÜK TRENDLERİ SÜRMEK İÇİN)
+                trail_thresh = Decimal("5.0") if is_macro else Decimal("2.5")
+                if profit_pct >= trail_thresh:
+                    best = self._trail_highs.get(symbol, mark_price)
+
+                    if direction == "LONG":
+                        if mark_price > best:
+                            self._trail_highs[symbol] = mark_price
+                        effective_high = max(best, mark_price)
+                        trail_dist = effective_high * Decimal("0.038") if is_macro else entry_p * Decimal("0.018")
+                        new_sl = self._client.round_price(symbol, effective_high - trail_dist)
                         if new_sl > trade.sl_price:
+                            tag = "🚀 SÜPER BOĞA TRAILING" if is_macro else "TRAILING STOP"
+                            logger.info(
+                                f"[{symbol}] {tag} SÜRÜLDÜ (Zirve={effective_high}) -> Yeni SL={new_sl} (Kâr=+%{profit_pct:.2f})"
+                            )
                             await self._update_sl(trade, new_sl)
-                else:  # SHORT
-                    if mark_price < best:
-                        self._trail_highs[symbol] = mark_price
-                        new_sl = mark_price + Decimal(str(
-                            float(trade.entry_price) * 0.01
-                        ))
-                        new_sl = min(new_sl, trade.sl_price)
+                    else:  # SHORT (LUNA Çöküş Takibi)
+                        if mark_price < best:
+                            self._trail_highs[symbol] = mark_price
+                        effective_low = min(best, mark_price)
+                        trail_dist = effective_low * Decimal("0.038") if is_macro else entry_p * Decimal("0.018")
+                        new_sl = self._client.round_price(symbol, effective_low + trail_dist)
                         if new_sl < trade.sl_price:
+                            tag = "💀 LUNA ÇÖKÜŞ TRAILING" if is_macro else "TRAILING STOP"
+                            logger.info(
+                                f"[{symbol}] {tag} SÜRÜLDÜ (Dip={effective_low}) -> Yeni SL={new_sl} (Kâr=+%{profit_pct:.2f})"
+                            )
                             await self._update_sl(trade, new_sl)
 
             except Exception as exc:
@@ -315,12 +386,15 @@ class OrderManager:
 
         # Yeni SL
         try:
-            resp = await self._client.place_stop_market(symbol, sl_side, new_sl)
+            resp = await self._client.place_stop_market(symbol, sl_side, new_sl, quantity=trade.quantity)
             new_sl_id = str(resp.get("orderId", ""))
             await update_trade(trade.id, sl_price=new_sl, sl_order_id=new_sl_id)
             logger.info(f"TRAILING {symbol} yeni SL={new_sl:.4f}")
         except Exception as exc:
-            logger.error(f"[{symbol}] Yeni SL yerleştirilemedi: {exc}")
+            # -4120 Algo kısıtlaması varsa bot içi SL'yi güncelle
+            trade.sl_price = new_sl
+            await update_trade(trade.id, sl_price=new_sl)
+            logger.info(f"TRAILING (Bot İçi) {symbol} yeni SL={new_sl:.4f}")
 
     # ── Pozisyon Senkronizasyonu ──────────────────────────────────────────────
 

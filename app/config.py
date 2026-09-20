@@ -49,6 +49,7 @@ class Config:
     MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "65.0"))
     MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "50.0"))
     MAX_LEVERAGE: int = int(_opt("MAX_LEVERAGE", "20"))
+    ONLY_LONG: bool = _opt("ONLY_LONG", "true").lower() == "true"
 
     # ─── Risk ────────────────────────────────────────────────────────────────
     DAILY_LOSS_LIMIT_PCT: Decimal = Decimal(_opt("DAILY_LOSS_LIMIT_PCT", "5.0"))

@@ -163,12 +163,14 @@ class WebSocketManager:
             return
         kline = data["k"]
         symbol = data["s"]
+        is_closed = kline.get("x", False)
 
         # Her mumda store'u güncelle (kapanmamış mum bile)
         self.store.update(symbol, kline)
 
         # Sadece kapanmış mumda callback çağır
-        if kline.get("x"):
+        if is_closed:
+            logger.info(f"WS kline kapandı: {symbol}")
             try:
                 await self.on_kline_close(symbol, kline)
             except Exception as exc:
