@@ -70,6 +70,11 @@ class TradingBot:
         await self.client.start()
 
         # ── 3. Bakiye doğrula ve bekleme döngüsü ──────────────────────────────
+        balance = Decimal("0")
+        wallet_bal = Decimal("0")
+        total_balance = Decimal("0")
+        unrealized = Decimal("0")
+
         while self._running or not hasattr(self, '_started_once'):
             self._started_once = True
             try:
@@ -132,6 +137,13 @@ class TradingBot:
         await self.user_stream.start()
 
         # ── 11. Dashboard state güncelle ──────────────────────────────────────
+        try:
+            wallet_bal = await self.client.get_wallet_balance_usdt()
+            total_balance = await self.client.get_total_balance_usdt()
+            unrealized = total_balance - wallet_bal
+        except Exception:
+            pass
+
         update_bot_state(
             running=True,
             balance=float(total_balance),
@@ -144,7 +156,7 @@ class TradingBot:
             uptime_start=datetime.utcnow().isoformat(),
         )
 
-        await self.notifier.bot_started(balance, len(self._symbols))
+        await self.notifier.bot_started(total_balance, len(self._symbols))
 
         self._running = True
         logger.info(f"Bot hazır — {len(self._symbols)} sembol takip ediliyor")
@@ -469,7 +481,7 @@ class TradingBot:
 
         # ── 14. Dashboard güncelle ────────────────────────────────────────────
         open_count = len(await get_open_trades())
-        update_bot_state(open_positions=open_count, balance=float(balance))
+        update_bot_state(open_positions=open_count, balance=float(total_balance))
         await broadcast_ws({"type": "position_update"})
 
     # ── Pozisyon Kapanma Callback ─────────────────────────────────────────────
