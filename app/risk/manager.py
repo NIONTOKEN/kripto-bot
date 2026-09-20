@@ -80,26 +80,38 @@ class RiskManager:
         balance: Decimal,
         direction: str,
         signal_type: str = "NORMAL",
-    ) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
+    ) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal], int]:
         """
-        ATR tabanlı ve otomatik bileşik büyümeli pozisyon boyutu hesapla.
+        ATR tabanlı, dinamik kaldıraçlı ve otomatik bileşik büyümeli pozisyon boyutu hesapla.
 
-        Returns: (quantity, sl_price, tp_price) veya (None, None, None)
+        Returns: (quantity, sl_price, tp_price, leverage) veya (None, None, None, leverage)
         """
+        # Varsayılan kaldıraç
+        default_lev = config.LEVERAGE
+
+        # ── 0. DİNAMİK KALDIRAÇ BELİRLEME (VUR-KAÇ vs MAKRO) ───────────────────
+        if signal_type.startswith("SCALP"):
+            # Vur-Kaç Scalp: Hızlı kâr alımı, yüksek kaldıraç (örn. 15x-20x)
+            leverage = min(config.SCALP_LEVERAGE, config.MAX_LEVERAGE)
+        elif signal_type in ("SUPER_LONG", "COLLAPSE_SHORT"):
+            # Uzun vadeli makro trend / çöküş: Daha temkinli kaldıraç (örn. 6x-8x)
+            leverage = min(config.SWING_LEVERAGE, 8)
+        else:
+            # Gün içi standart trend
+            leverage = min(config.LEVERAGE, config.MAX_LEVERAGE)
+
+        lev_dec = Decimal(str(leverage))
+
         try:
             price = Decimal(str(ind.close))
             atr = Decimal(str(ind.atr))
 
             if price <= 0 or atr <= 0:
                 logger.warning(f"[{symbol}] Geçersiz fiyat veya ATR")
-                return None, None, None
+                return None, None, None, leverage
 
-            # ── 1. OTOMATİK BİLEŞİK BÜYÜME (AUTO-COMPOUNDING) MARJİN BELİRLEME ───
-            # Cüzdan bakiyesine göre kademeli pozisyon marjini:
-            # - Bakiye < 25 USDT: %25 marjin per pozisyon (örn: 11$ -> ~2.75$ marjin)
-            # - 25 <= Bakiye < 100 USDT: %22 marjin (örn: 50$ -> 11$ marjin)
-            # - 100 <= Bakiye < 1000 USDT: %20 marjin (örn: 250$ -> 50$ marjin)
-            # - Bakiye >= 1000 USDT: %15 marjin (örn: 2000$ -> 300$ marjin)
+            # ── 1. OTOMATİK BİLEŞİK BÜYÜME MARJİN BELİRLEME ───────────────────
+            # Cüzdan bakiyesine göre kademeli pozisyon marjini
             if balance < Decimal("25"):
                 margin_pct = Decimal("0.25")
             elif balance < Decimal("100"):
@@ -110,36 +122,57 @@ class RiskManager:
                 margin_pct = Decimal("0.15")
 
             target_margin = balance * margin_pct
-            target_margin = max(target_margin, Decimal("2.0"))  # Binance min işlem için en az 2 USDT
-            target_notional = target_margin * Decimal(str(config.LEVERAGE))
 
-            # Minimum qty ve notional kontrolleri (Binance kuralları)
-            min_qty = self._client.get_min_qty(symbol)
+            # Binance min notional kontrolü (Genelde 5 USDT)
             min_notional = self._client.get_min_notional(symbol)
-            target_notional = max(target_notional, min_notional * Decimal("1.15"))
+            min_qty = self._client.get_min_qty(symbol)
+
+            # Minimum notional'ı karşılamak için gereken asgari marjin
+            min_required_margin = (min_notional * Decimal("1.10")) / lev_dec
+            target_margin = max(target_margin, min_required_margin)
+            target_notional = target_margin * lev_dec
+            target_notional = max(target_notional, min_notional * Decimal("1.10"), Decimal("5.20"))
 
             # Hedef miktar (quantity)
             raw_qty = target_notional / price
             qty = self._client.round_qty(symbol, raw_qty)
             qty = max(qty, min_qty)
 
+            # Miktar * Fiyat min_notional'ın altında kalırsa bir kademe artır
+            if qty * price < min_notional:
+                step = self._client.get_step_size(symbol)
+                while qty * price < min_notional * Decimal("1.05"):
+                    qty += step
+                qty = self._client.round_qty(symbol, qty)
+
             # Gerekli marjin kontrolü
-            required_margin = (qty * price) / Decimal(str(config.LEVERAGE))
+            required_margin = (qty * price) / lev_dec
             if required_margin > balance * Decimal("0.90"):
-                # Bakiye yetersizse bakiyenin %85'ine sığacak maksimum miktarı ver
-                max_afford_notional = (balance * Decimal("0.85")) * Decimal(str(config.LEVERAGE))
+                # Bakiye yetersizse bakiyenin %85'ine sığacak maksimum miktarı dene
+                max_afford_notional = (balance * Decimal("0.85")) * lev_dec
                 if max_afford_notional < min_notional:
-                    logger.warning(f"[{symbol}] Bakiye en küçük işlem için yetersiz: {balance:.2f} USDT")
-                    return None, None, None
+                    logger.warning(
+                        f"[{symbol}] Bakiye en küçük işlem ({min_notional:.2f}$) için yetersiz: "
+                        f"Bakiye={balance:.2f} USDT, Gereken Marjin={min_required_margin:.2f} USDT"
+                    )
+                    return None, None, None, leverage
                 qty = self._client.round_qty(symbol, max_afford_notional / price)
                 qty = max(qty, min_qty)
-                required_margin = (qty * price) / Decimal(str(config.LEVERAGE))
+                required_margin = (qty * price) / lev_dec
 
-            # ── 2. STOP LOSS & TAKE PROFIT (MAKRO ÇÖKÜŞ & PARABOLİK TREND AYARI) ─
-            if signal_type == "COLLAPSE_SHORT":
-                # LUNA tipi makro çöküş: Erken kâr alıp çıkmak YASAK!
-                # Günlerce, haftalarca sürmek için TP tabanı çok derin (%85 çöküş hedefi),
-                # İşlemi Trailing Stop dipten takip eder.
+            # ── 2. STOP LOSS & TAKE PROFIT AYARLARI ────────────────────────────
+            if signal_type.startswith("SCALP"):
+                # Vur-Kaç Scalp: Dar SL (%0.9-%1.2), hızlı TP (%1.8-%2.5)
+                sl_distance = max(atr * Decimal("1.1"), price * Decimal("0.010"))
+                tp_distance = max(atr * Decimal("2.0"), price * Decimal("0.022"))
+                if direction == "LONG":
+                    sl_price = price - sl_distance
+                    tp_price = price + tp_distance
+                else:
+                    sl_price = price + sl_distance
+                    tp_price = price - tp_distance
+            elif signal_type == "COLLAPSE_SHORT":
+                # LUNA tipi makro çöküş: Erken kâr alıp çıkmak YASAK! Derin TP, Trailing takip eder
                 sl_distance = max(atr * Decimal("3.0"), price * Decimal("0.035"))
                 tp_distance = price * Decimal("0.85")
                 sl_price = price + sl_distance
@@ -152,7 +185,7 @@ class RiskManager:
                 tp_price = price + tp_distance
             else:
                 # Normal gün içi trend işlemleri
-                min_sl_dist = price * Decimal("0.020")
+                min_sl_dist = price * Decimal("0.018")
                 calc_sl_dist = atr * Decimal(str(config.SL_ATR_MULTIPLIER))
                 sl_distance = max(calc_sl_dist, min_sl_dist)
 
@@ -168,17 +201,17 @@ class RiskManager:
                     tp_price = price - tp_distance
 
             if sl_price <= 0 or tp_price <= 0:
-                return None, None, None
+                return None, None, None, leverage
 
             sl_price = self._client.round_price(symbol, sl_price)
             tp_price = self._client.round_price(symbol, tp_price)
 
             logger.info(
                 f"[{symbol}] Pozisyon Boyutu Hesaplandı ({signal_type}): Notional={qty * price:.2f}$ "
-                f"(Marjin={required_margin:.2f}$ [{config.LEVERAGE}x]) | SL={sl_price} | TP={tp_price}"
+                f"(Marjin={required_margin:.2f}$ [{leverage}x]) | SL={sl_price} | TP={tp_price}"
             )
-            return qty, sl_price, tp_price
+            return qty, sl_price, tp_price, leverage
 
         except Exception as exc:
             logger.error(f"[{symbol}] Pozisyon boyutu hesaplama hatası: {exc}")
-            return None, None, None
+            return None, None, None, leverage

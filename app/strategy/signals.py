@@ -114,12 +114,41 @@ def calculate_signal(
         above_ema200 and
         (regime != Regime.BEAR_TREND) and
         (btc_bullish is not False) and
-        (total > 0.26) and
+        (total > 0.24) and
         (not (ob and ob.has_ask_wall)) and
         (ind.rsi > 36 and ind.rsi < 68)
     )
 
-    # Karar Motoru:
+    # 📉 D) INTRADAY_SHORT (Normal Gün İçi Trend Short):
+    allow_regular_short = (
+        trend_1h == "BEARISH" and
+        below_ema200 and
+        (regime != Regime.BULL_TREND) and
+        (btc_bullish is not True) and
+        (total < -0.24) and
+        (not (ob and ob.has_bid_wall)) and
+        (ind.rsi > 32 and ind.rsi < 64)
+    )
+
+    # ⚡ E) SCALP_LONG (Hızlı Vur-Kaç Long - Anlık Alıcı Baskısı):
+    allow_scalp_long = (
+        config.SCALP_MODE and
+        (ob is not None and ob.imbalance >= 20.0) and
+        (total > 0.20) and
+        (not (ob and ob.has_ask_wall)) and
+        (ind.rsi < 75)
+    )
+
+    # ⚡ F) SCALP_SHORT (Hızlı Vur-Kaç Short - Anlık Satıcı Baskısı):
+    allow_scalp_short = (
+        config.SCALP_MODE and
+        (ob is not None and ob.imbalance <= -20.0) and
+        (total < -0.20) and
+        (not (ob and ob.has_bid_wall)) and
+        (ind.rsi > 25)
+    )
+
+    # Karar Motoru Öncelik Sıralaması:
     if is_death_spiral:
         direction = "SHORT"
         score = min(100.0, abs(total) * 110)
@@ -128,11 +157,37 @@ def calculate_signal(
         direction = "LONG"
         score = min(100.0, total * 110)
         signal_type = "SUPER_LONG"
+    elif allow_scalp_long and total > 0.28:
+        direction = "LONG"
+        score = min(100.0, total * 115)
+        signal_type = "SCALP_LONG"
+    elif allow_scalp_short and total < -0.28:
+        direction = "SHORT"
+        score = min(100.0, abs(total) * 115)
+        signal_type = "SCALP_SHORT"
     elif allow_regular_long:
         direction = "LONG"
         score = min(100.0, total * 100)
         signal_type = "INTRADAY_LONG"
+    elif allow_regular_short:
+        direction = "SHORT"
+        score = min(100.0, abs(total) * 100)
+        signal_type = "INTRADAY_SHORT"
+    elif allow_scalp_long:
+        direction = "LONG"
+        score = min(100.0, total * 105)
+        signal_type = "SCALP_LONG"
+    elif allow_scalp_short:
+        direction = "SHORT"
+        score = min(100.0, abs(total) * 105)
+        signal_type = "SCALP_SHORT"
     else:
+        direction = "NEUTRAL"
+        score = 0.0
+        signal_type = "NORMAL"
+
+    # Sadece LONG modu kontrolü
+    if config.ONLY_LONG and direction == "SHORT" and signal_type != "COLLAPSE_SHORT":
         direction = "NEUTRAL"
         score = 0.0
         signal_type = "NORMAL"
@@ -140,8 +195,10 @@ def calculate_signal(
     score_threshold = config.MIN_SCORE_TO_OPEN
     if signal_type in ("SUPER_LONG", "COLLAPSE_SHORT"):
         score_threshold = min(config.MIN_SCORE_TO_OPEN, 40.0)
+    elif "SCALP" in signal_type:
+        score_threshold = min(config.MIN_SCORE_TO_OPEN, 38.0)
     elif regime in (Regime.RANGING, Regime.VOLATILE):
-        score_threshold = config.MIN_SCORE_TO_OPEN * 1.15
+        score_threshold = config.MIN_SCORE_TO_OPEN * 1.10
 
     if score < score_threshold:
         direction = "NEUTRAL"

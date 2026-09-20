@@ -454,8 +454,8 @@ class TradingBot:
             logger.info(f"[{symbol}] Risk: {risk_check.reason}")
             return
 
-        # ── 11. Pozisyon boyutu (Bileşik Büyüme & Trend Tipi Odaklı) ─────────
-        qty, sl_price, tp_price = self.risk_manager.calculate_position_size(
+        # ── 11. Pozisyon boyutu (Dinamik Kaldıraç & Trend Tipi Odaklı) ───────
+        qty, sl_price, tp_price, leverage = self.risk_manager.calculate_position_size(
             symbol, ind, total_balance, signal.direction, signal_type=signal.signal_type
         )
         if qty is None or sl_price is None or tp_price is None:
@@ -464,7 +464,7 @@ class TradingBot:
 
         # ── 12. Emir gönder ───────────────────────────────────────────────────
         trade = await self.order_manager.open_position(
-            symbol, signal, qty, sl_price, tp_price
+            symbol, signal, qty, sl_price, tp_price, leverage=leverage
         )
         if trade is None:
             return
@@ -476,7 +476,7 @@ class TradingBot:
         )
         await self.notifier.order_opened(
             symbol, signal.direction, qty,
-            Decimal(str(ind.close)), sl_price, tp_price, config.LEVERAGE
+            Decimal(str(ind.close)), sl_price, tp_price, leverage
         )
 
         # ── 14. Dashboard güncelle ────────────────────────────────────────────
@@ -529,18 +529,25 @@ class TradingBot:
         WebSocket kline eventine ek olarak her 5 dakikada saat bazlı
         sinyal taraması yapılır (fallback + güvenlik).
         """
-        pos_sync_interval = config.POSITION_CHECK_INTERVAL
-        status_update_interval = 60
+        pos_sync_interval = 20
+        status_update_interval = 30
         pos_sync_counter = 0
         status_counter = 0
         time_sync_counter = 0
         last_scan_minute = -1  # Son tarama yapılan dakika
 
         while self._running:
-            await asyncio.sleep(10)
-            pos_sync_counter += 10
-            status_counter += 10
-            time_sync_counter += 10
+            await asyncio.sleep(3)
+            pos_sync_counter += 3
+            status_counter += 3
+            time_sync_counter += 3
+
+            # ── 1. Canlı Trailing Stop & Vur-Kaç Kontrolü (Her 3 saniyede bir) ──
+            if config.TRAILING_STOP:
+                try:
+                    await self.order_manager.update_trailing_stops()
+                except Exception as exc:
+                    logger.debug(f"Trailing stop döngü hatası: {exc}")
 
             # ── Saat bazlı 5 dakikalık sembol taraması (ANA MEKANİZMA) ─────────
             import time as _time
@@ -567,13 +574,11 @@ class TradingBot:
                 except Exception:
                     pass
 
-            # ── Pozisyon senkronizasyonu ──────────────────────────────────────
+            # ── Pozisyon senkronizasyonu (20sn) ──────────────────────────────
             if pos_sync_counter >= pos_sync_interval:
                 pos_sync_counter = 0
                 try:
                     await self.order_manager.sync_positions()
-                    if config.TRAILING_STOP:
-                        await self.order_manager.update_trailing_stops()
                 except Exception as exc:
                     logger.error(f"Periyodik senkronizasyon hatası: {exc}")
 

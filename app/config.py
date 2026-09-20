@@ -49,12 +49,15 @@ class Config:
     MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "42.0"))
     MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "1.0"))
     MAX_LEVERAGE: int = int(_opt("MAX_LEVERAGE", "20"))
-    ONLY_LONG: bool = _opt("ONLY_LONG", "true").lower() == "true"
+    ONLY_LONG: bool = _opt("ONLY_LONG", "false").lower() == "true"
+    SCALP_MODE: bool = _opt("SCALP_MODE", "true").lower() == "true"
+    SCALP_LEVERAGE: int = int(_opt("SCALP_LEVERAGE", "15"))
+    SWING_LEVERAGE: int = int(_opt("SWING_LEVERAGE", "8"))
 
     # ─── Risk ────────────────────────────────────────────────────────────────
     DAILY_LOSS_LIMIT_PCT: Decimal = Decimal(_opt("DAILY_LOSS_LIMIT_PCT", "50.0"))
-    SL_ATR_MULTIPLIER: Decimal = Decimal(_opt("SL_ATR_MULTIPLIER", "2.5"))
-    TP_ATR_MULTIPLIER: Decimal = Decimal(_opt("TP_ATR_MULTIPLIER", "5.0"))
+    SL_ATR_MULTIPLIER: Decimal = Decimal(_opt("SL_ATR_MULTIPLIER", "1.5"))
+    TP_ATR_MULTIPLIER: Decimal = Decimal(_opt("TP_ATR_MULTIPLIER", "3.0"))
     TRAILING_STOP: bool = _opt("TRAILING_STOP", "true").lower() == "true"
 
     # ─── Semboller ───────────────────────────────────────────────────────────
@@ -90,7 +93,7 @@ class Config:
 
     # ─── Zamanlama ───────────────────────────────────────────────────────────
     STALE_DATA_SECONDS: int = int(_opt("STALE_DATA_SECONDS", "120"))
-    POSITION_CHECK_INTERVAL: int = int(_opt("POSITION_CHECK_INTERVAL", "30"))
+    POSITION_CHECK_INTERVAL: int = int(_opt("POSITION_CHECK_INTERVAL", "5"))
     LISTEN_KEY_REFRESH_MINUTES: int = int(_opt("LISTEN_KEY_REFRESH_MINUTES", "45"))
 
 

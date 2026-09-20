@@ -53,6 +53,7 @@ class OrderManager:
         quantity: Decimal,
         sl_price: Decimal,
         tp_price: Decimal,
+        leverage: Optional[int] = None,
     ) -> Optional[Trade]:
         """
         1. Leverage ve margin tip ayarla
@@ -66,6 +67,7 @@ class OrderManager:
             logger.warning(f"[{symbol}] Zaten açık pozisyon var, yeni pozisyon açılmıyor")
             return None
 
+        target_leverage = leverage if leverage is not None else config.LEVERAGE
         direction = signal.direction  # LONG / SHORT
         side = "BUY" if direction == "LONG" else "SELL"
         sl_side = "SELL" if direction == "LONG" else "BUY"
@@ -79,9 +81,9 @@ class OrderManager:
             logger.warning(f"[{symbol}] Margin tipi ayarlanamadı (Multi-Asset modu aktif olabilir): {exc}")
 
         try:
-            await self._client.set_leverage(symbol, config.LEVERAGE)
+            await self._client.set_leverage(symbol, target_leverage)
         except Exception as exc:
-            logger.error(f"[{symbol}] Leverage ayar hatası: {exc}")
+            logger.error(f"[{symbol}] Leverage ({target_leverage}x) ayar hatası: {exc}")
             return None
 
         # ── 2. Market order ───────────────────────────────────────────────────
@@ -142,7 +144,7 @@ class OrderManager:
             sl_price=sl_price,
             tp_price=tp_price,
             quantity=quantity,
-            leverage=config.LEVERAGE,
+            leverage=target_leverage,
             status="OPEN",
             entry_order_id=order_id,
             sl_order_id=sl_order_id,
@@ -314,32 +316,82 @@ class OrderManager:
                 sig_type = self._trade_types.get(
                     symbol, "COLLAPSE_SHORT" if direction == "SHORT" else "NORMAL"
                 )
+                is_scalp = sig_type.startswith("SCALP")
                 is_macro = sig_type in ("COLLAPSE_SHORT", "SUPER_LONG")
 
-                # ── 1. BREAK-EVEN KİLİTLEME (RİSKSİZ İŞLEM) ────────────────────
-                be_sl = None
-                be_thresh = Decimal("3.0") if is_macro else Decimal("1.2")
+                if symbol not in self._trail_highs:
+                    self._trail_highs[symbol] = mark_price
+
+                # ── 0. EMİR DEFTERİ TERS BASKI ÇIKIŞI (VUR-KAÇ HIZLI KÂR AL) ───
+                # Pozisyon kârdaysa (+%0.70 üzeri) ve karşı tarafta ani satış/alış duvarı veya ters baskı gelirse kârı cebe koyup hemen çık!
+                if profit_pct >= Decimal("0.70") and not is_macro:
+                    try:
+                        depth = await self._client.get_order_book(symbol, limit=20)
+                        from app.strategy.orderbook import analyze_order_book
+                        ob = analyze_order_book(depth, float(mark_price))
+
+                        should_quick_tp = False
+                        wall_info = ""
+                        if direction == "LONG" and (ob.imbalance <= -0.30 or ob.has_ask_wall):
+                            should_quick_tp = True
+                            wall_info = f"Satış duvarı={ob.ask_wall_price}" if ob.has_ask_wall else f"Satıcı Dengesizliği={ob.imbalance:.2f}"
+                        elif direction == "SHORT" and (ob.imbalance >= 0.30 or ob.has_bid_wall):
+                            should_quick_tp = True
+                            wall_info = f"Alış duvarı={ob.bid_wall_price}" if ob.has_bid_wall else f"Alıcı Dengesizliği={ob.imbalance:.2f}"
+
+                        if should_quick_tp:
+                            logger.info(
+                                f"[{symbol}] ⚡ VUR-KAÇ HIZLI KÂR KORUMA (+%{profit_pct:.2f}) - {wall_info} tespit edildi! Kâr cebe kilitleniyor."
+                            )
+                            await self._client.close_position_market(symbol, close_side, trade.quantity)
+                            pnl = (mark_price - trade.entry_price) * trade.quantity if direction == "LONG" else (trade.entry_price - mark_price) * trade.quantity
+                            await self._close_trade(trade, "QUICK_TP", mark_price, pnl)
+                            continue
+                    except Exception as ob_exc:
+                        logger.debug(f"[{symbol}] Derinlik analiz hatası: {ob_exc}")
+
+                # ── 1. KADEME 1: BREAK-EVEN KİLİTLEME (+%0.55 KÂRDA SIFIR RİSK) ─
+                be_thresh = Decimal("2.5") if is_macro else Decimal("0.55")
                 if profit_pct >= be_thresh:
                     if direction == "LONG":
-                        lock_mult = Decimal("1.010") if is_macro else Decimal("1.002")
+                        lock_mult = Decimal("1.008") if is_macro else Decimal("1.001")
                         target_be = self._client.round_price(symbol, entry_p * lock_mult)
                         if trade.sl_price < target_be:
-                            be_sl = target_be
+                            tag = f"MAKRO {sig_type}" if is_macro else "⚡ VUR-KAÇ"
+                            logger.info(
+                                f"[{symbol}] {tag} BREAK-EVEN KİLİTLENDİ (Kâr=+%{profit_pct:.2f}) -> Yeni SL={target_be}"
+                            )
+                            await self._update_sl(trade, target_be)
                     else:  # SHORT
-                        lock_mult = Decimal("0.990") if is_macro else Decimal("0.998")
+                        lock_mult = Decimal("0.992") if is_macro else Decimal("0.999")
                         target_be = self._client.round_price(symbol, entry_p * lock_mult)
                         if trade.sl_price > target_be:
-                            be_sl = target_be
+                            tag = f"MAKRO {sig_type}" if is_macro else "⚡ VUR-KAÇ"
+                            logger.info(
+                                f"[{symbol}] {tag} BREAK-EVEN KİLİTLENDİ (Kâr=+%{profit_pct:.2f}) -> Yeni SL={target_be}"
+                            )
+                            await self._update_sl(trade, target_be)
 
-                if be_sl:
-                    tag = f"MAKRO {sig_type}" if is_macro else "GÜN İÇİ"
-                    logger.info(
-                        f"[{symbol}] {tag} BREAK-EVEN KİLİTLENDİ (Kâr=+%{profit_pct:.2f}) -> Risksiz trend sürüşü! Yeni SL={be_sl}"
-                    )
-                    await self._update_sl(trade, be_sl)
+                # ── 2. KADEME 2: ASGARİ KÂR KİLİTLEME (+%1.00 KÂRDA ASGARİ %0.50 CEPTE)
+                lock_thresh = Decimal("1.00")
+                if profit_pct >= lock_thresh and not is_macro:
+                    if direction == "LONG":
+                        target_lock = self._client.round_price(symbol, entry_p * Decimal("1.005"))
+                        if trade.sl_price < target_lock:
+                            logger.info(
+                                f"[{symbol}] 🔒 ASGARİ KÂR KİLİTLENDİ (+%{profit_pct:.2f}) -> SL={target_lock} (+%0.50 kâr garanti)"
+                            )
+                            await self._update_sl(trade, target_lock)
+                    else:  # SHORT
+                        target_lock = self._client.round_price(symbol, entry_p * Decimal("0.995"))
+                        if trade.sl_price > target_lock:
+                            logger.info(
+                                f"[{symbol}] 🔒 ASGARİ KÂR KİLİTLENDİ (+%{profit_pct:.2f}) -> SL={target_lock} (+%0.50 kâr garanti)"
+                            )
+                            await self._update_sl(trade, target_lock)
 
-                # ── 2. DİNAMİK TREND TRAILING STOP (BÜYÜK TRENDLERİ SÜRMEK İÇİN)
-                trail_thresh = Decimal("5.0") if is_macro else Decimal("2.5")
+                # ── 3. KADEME 3: DİNAMİK YAKIN İZ SÜREN STOP (TRAILING STOP) ────
+                trail_thresh = Decimal("4.0") if is_macro else Decimal("1.35")
                 if profit_pct >= trail_thresh:
                     best = self._trail_highs.get(symbol, mark_price)
 
@@ -347,24 +399,40 @@ class OrderManager:
                         if mark_price > best:
                             self._trail_highs[symbol] = mark_price
                         effective_high = max(best, mark_price)
-                        trail_dist = effective_high * Decimal("0.038") if is_macro else entry_p * Decimal("0.018")
+
+                        # Scalp için zirveden sadece %0.4 geriden izle! Kârın erimesine ASLA izin verme
+                        if is_scalp:
+                            trail_dist = effective_high * Decimal("0.004")
+                        elif is_macro:
+                            trail_dist = effective_high * Decimal("0.035")
+                        else:
+                            trail_dist = effective_high * Decimal("0.006")
+
                         new_sl = self._client.round_price(symbol, effective_high - trail_dist)
                         if new_sl > trade.sl_price:
-                            tag = "🚀 SÜPER BOĞA TRAILING" if is_macro else "TRAILING STOP"
+                            tag = "🚀 SÜPER BOĞA TRAIL" if is_macro else "⚡ SIKI TRAILING"
                             logger.info(
-                                f"[{symbol}] {tag} SÜRÜLDÜ (Zirve={effective_high}) -> Yeni SL={new_sl} (Kâr=+%{profit_pct:.2f})"
+                                f"[{symbol}] {tag} ZİRVEDEN İZ SÜRDÜ (Zirve={effective_high}) -> Yeni SL={new_sl} (Kâr=+%{profit_pct:.2f})"
                             )
                             await self._update_sl(trade, new_sl)
-                    else:  # SHORT (LUNA Çöküş Takibi)
+                    else:  # SHORT
                         if mark_price < best:
                             self._trail_highs[symbol] = mark_price
                         effective_low = min(best, mark_price)
-                        trail_dist = effective_low * Decimal("0.038") if is_macro else entry_p * Decimal("0.018")
+
+                        # Scalp için dipten sadece %0.4 geriden izle!
+                        if is_scalp:
+                            trail_dist = effective_low * Decimal("0.004")
+                        elif is_macro:
+                            trail_dist = effective_low * Decimal("0.035")
+                        else:
+                            trail_dist = effective_low * Decimal("0.006")
+
                         new_sl = self._client.round_price(symbol, effective_low + trail_dist)
                         if new_sl < trade.sl_price:
-                            tag = "💀 LUNA ÇÖKÜŞ TRAILING" if is_macro else "TRAILING STOP"
+                            tag = "💀 ÇÖKÜŞ TRAIL" if is_macro else "⚡ SIKI TRAILING"
                             logger.info(
-                                f"[{symbol}] {tag} SÜRÜLDÜ (Dip={effective_low}) -> Yeni SL={new_sl} (Kâr=+%{profit_pct:.2f})"
+                                f"[{symbol}] {tag} DİPTEN İZ SÜRDÜ (Dip={effective_low}) -> Yeni SL={new_sl} (Kâr=+%{profit_pct:.2f})"
                             )
                             await self._update_sl(trade, new_sl)
 
