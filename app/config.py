@@ -47,8 +47,8 @@ class Config:
     MAX_OPEN_POSITIONS: int = int(_opt("MAX_OPEN_POSITIONS", "4"))
     RISK_PER_TRADE_PCT: Decimal = Decimal(_opt("RISK_PER_TRADE_PCT", "28.0"))
     MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "42.0"))
-    MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "1.0"))
-    MAX_LEVERAGE: int = int(_opt("MAX_LEVERAGE", "20"))
+    MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "0.2"))
+    MAX_LEVERAGE: int = int(_opt("MAX_LEVERAGE", "25"))
     ONLY_LONG: bool = _opt("ONLY_LONG", "false").lower() == "true"
     SCALP_MODE: bool = _opt("SCALP_MODE", "true").lower() == "true"
     SCALP_LEVERAGE: int = int(_opt("SCALP_LEVERAGE", "15"))

@@ -90,7 +90,10 @@ class RiskManager:
         default_lev = config.LEVERAGE
 
         # ── 0. DİNAMİK KALDIRAÇ BELİRLEME (VUR-KAÇ vs MAKRO) ───────────────────
-        if signal_type.startswith("SCALP"):
+        if balance < Decimal("1.5"):
+            # Mikro Bakiye Modu (0.2 - 1.5 USDT): Binance 5$ minimum işlem kuralını karşılamak için 20x-25x kaldıraç
+            leverage = min(25, config.MAX_LEVERAGE)
+        elif signal_type.startswith("SCALP"):
             # Vur-Kaç Scalp: Hızlı kâr alımı, yüksek kaldıraç (örn. 15x-20x)
             leverage = min(config.SCALP_LEVERAGE, config.MAX_LEVERAGE)
         elif signal_type in ("SUPER_LONG", "COLLAPSE_SHORT"):
@@ -112,7 +115,9 @@ class RiskManager:
 
             # ── 1. OTOMATİK BİLEŞİK BÜYÜME MARJİN BELİRLEME ───────────────────
             # Cüzdan bakiyesine göre kademeli pozisyon marjini
-            if balance < Decimal("25"):
+            if balance < Decimal("1.5"):
+                margin_pct = Decimal("0.95")  # Mikro bakiyede neredeyse tüm kasayı tek işleme bağla
+            elif balance < Decimal("25"):
                 margin_pct = Decimal("0.25")
             elif balance < Decimal("100"):
                 margin_pct = Decimal("0.22")
@@ -128,10 +133,10 @@ class RiskManager:
             min_qty = self._client.get_min_qty(symbol)
 
             # Minimum notional'ı karşılamak için gereken asgari marjin
-            min_required_margin = (min_notional * Decimal("1.10")) / lev_dec
+            min_required_margin = (min_notional * Decimal("1.05")) / lev_dec
             target_margin = max(target_margin, min_required_margin)
             target_notional = target_margin * lev_dec
-            target_notional = max(target_notional, min_notional * Decimal("1.10"), Decimal("5.20"))
+            target_notional = max(target_notional, min_notional * Decimal("1.05"), Decimal("5.10"))
 
             # Hedef miktar (quantity)
             raw_qty = target_notional / price
@@ -141,15 +146,16 @@ class RiskManager:
             # Miktar * Fiyat min_notional'ın altında kalırsa bir kademe artır
             if qty * price < min_notional:
                 step = self._client.get_step_size(symbol)
-                while qty * price < min_notional * Decimal("1.05"):
+                while qty * price < min_notional * Decimal("1.02"):
                     qty += step
                 qty = self._client.round_qty(symbol, qty)
 
             # Gerekli marjin kontrolü
             required_margin = (qty * price) / lev_dec
-            if required_margin > balance * Decimal("0.90"):
-                # Bakiye yetersizse bakiyenin %85'ine sığacak maksimum miktarı dene
-                max_afford_notional = (balance * Decimal("0.85")) * lev_dec
+            max_allowed_margin = balance * Decimal("0.96") if balance < Decimal("2.0") else balance * Decimal("0.90")
+            if required_margin > max_allowed_margin:
+                # Bakiye yetersizse bakiyenin %95'ine sığacak maksimum miktarı dene
+                max_afford_notional = (balance * Decimal("0.95")) * lev_dec
                 if max_afford_notional < min_notional:
                     logger.warning(
                         f"[{symbol}] Bakiye en küçük işlem ({min_notional:.2f}$) için yetersiz: "
