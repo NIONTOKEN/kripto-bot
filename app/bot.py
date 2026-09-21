@@ -35,7 +35,12 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # Global bot durdurucu bayrak (fatal hata durumunda yeni pozisyon açmayı durdur)
-_fatal_error = False
+DEFAULT_FALLBACK_SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+    "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "SUIUSDT",
+    "NEARUSDT", "APTUSDT", "PEPEUSDT", "SHIBUSDT", "DOTUSDT",
+    "LTCUSDT", "ARBUSDT", "OPUSDT", "INJUSDT", "FETUSDT",
+]
 
 
 class TradingBot:
@@ -100,27 +105,48 @@ class TradingBot:
                 logger.warning(f"Bakiye kontrol hatası: {exc}. 10sn sonra tekrar denenecek...")
                 await asyncio.sleep(10)
 
-        # ── 4. Risk manager ───────────────────────────────────────────────────
-        self.risk_manager = RiskManager(self.client)
-        await self.risk_manager.refresh_daily_baseline(total_balance)
+        # ── 4. Sembolleri keşfet / varsayılanları ata ─────────────────────────
+        self._symbols = await self._discover_symbols()
+        logger.info(f"Takip listesi hazırlandı: {len(self._symbols)} sembol")
 
-        # ── 5. Order manager ──────────────────────────────────────────────────
+        # ── 5. Dashboard State & Telegram Başlatıldı Bildirimi ─────────────────
+        # Geçmiş verilerin indirilmesini beklemeden kullanıcıya anında bildirim ver
+        update_bot_state(
+            running=True,
+            balance=float(total_balance),
+            wallet_balance=float(wallet_bal),
+            unrealized_pnl=float(unrealized),
+            symbols_tracked=len(self._symbols),
+            symbols_list=self._symbols,
+            testnet=config.BINANCE_TESTNET,
+            uptime_start=datetime.utcnow().isoformat(),
+            error=None,
+        )
+
+        try:
+            await self.notifier.bot_started(total_balance, len(self._symbols))
+            logger.info("Telegram 'BOT BAŞLATILDI' bildirimi iletildi")
+        except Exception as exc:
+            logger.warning(f"Telegram bildirim hatası: {exc}")
+
+        # ── 6. Risk manager ───────────────────────────────────────────────────
+        self.risk_manager = RiskManager(self.client)
+        try:
+            await self.risk_manager.refresh_daily_baseline(total_balance)
+        except Exception:
+            pass
+
+        # ── 7. Order manager ──────────────────────────────────────────────────
         self.order_manager = OrderManager(
             self.client,
             on_close=self._on_position_close,
         )
 
-        # ── 6. Sembolleri keşfet ──────────────────────────────────────────────
-        self._symbols = await self._discover_symbols()
-        if not self._symbols:
-            logger.critical("Hiç uygun sembol bulunamadı. Bot durduruldu.")
-            return
-
-        # ── 7. Geçmiş veri yükle + ML eğit ───────────────────────────────────
-        await self._seed_all_symbols()
-
         # ── 8. Binance'deki açık pozisyonları senkronize et ───────────────────
-        await self.order_manager.sync_positions()
+        try:
+            await self.order_manager.sync_positions()
+        except Exception as exc:
+            logger.warning(f"Pozisyon senkronizasyon hatası: {exc}")
 
         # ── 9. WebSocket başlat ───────────────────────────────────────────────
         self.ws_manager = WebSocketManager(
@@ -136,30 +162,11 @@ class TradingBot:
         )
         await self.user_stream.start()
 
-        # ── 11. Dashboard state güncelle ──────────────────────────────────────
-        try:
-            wallet_bal = await self.client.get_wallet_balance_usdt()
-            total_balance = await self.client.get_total_balance_usdt()
-            unrealized = total_balance - wallet_bal
-        except Exception:
-            pass
-
-        update_bot_state(
-            running=True,
-            balance=float(total_balance),
-            wallet_balance=float(wallet_bal),
-            unrealized_pnl=float(unrealized),
-            open_positions=len(await get_open_trades()),
-            symbols_tracked=len(self._symbols),
-            symbols_list=self._symbols,
-            testnet=config.BINANCE_TESTNET,
-            uptime_start=datetime.utcnow().isoformat(),
-        )
-
-        await self.notifier.bot_started(total_balance, len(self._symbols))
-
         self._running = True
-        logger.info(f"Bot hazır — {len(self._symbols)} sembol takip ediliyor")
+        logger.info(f"Bot tam aktif — {len(self._symbols)} sembol canlı akışta dinleniyor")
+
+        # ── 11. Geçmiş veri yüklemeyi arka planda başlat (ana akışı bloklamaz) ─
+        asyncio.create_task(self._seed_all_symbols())
 
         # ── 12. Periyodik görevler ────────────────────────────────────────────
         asyncio.create_task(self._periodic_tasks())
@@ -178,36 +185,41 @@ class TradingBot:
     async def _discover_symbols(self) -> List[str]:
         """
         24 saatlik işlem hacmine göre en yüksek N sembolü döner.
-        Kara listedekiler, kaldırılmış ve aktif olmayanlar hariçtutulur.
+        Kara listedekiler, kaldırılmış ve aktif olmayanlar hariç tutulur.
+        Hata durumunda veya boş gelirse en likit varsayılan sembollere döner.
         """
         try:
             ticker_data = await self.client.get_ticker_24h_all()
+            valid_symbols = set(self.client.symbol_info.keys())
+            blacklist = set(config.BLACKLIST)
+
+            scored = []
+            for t in ticker_data:
+                sym = t.get("symbol", "")
+                if valid_symbols and sym not in valid_symbols:
+                    continue
+                if sym in blacklist:
+                    continue
+                if not sym.endswith("USDT"):
+                    continue
+                try:
+                    vol = float(t.get("quoteVolume", 0))
+                    scored.append((sym, vol))
+                except (ValueError, TypeError):
+                    pass
+
+            scored.sort(key=lambda x: x[1], reverse=True)
+            symbols = [s for s, _ in scored[: config.TOP_SYMBOLS_COUNT]]
+            if symbols:
+                logger.info(f"Keşfedilen semboller: {', '.join(symbols)}")
+                return symbols
         except Exception as exc:
-            logger.error(f"Ticker verisi alınamadı: {exc}")
-            return []
+            logger.warning(f"Dinamik sembol keşfi hatası ({exc}), varsayılan semboller kullanılacak.")
 
-        valid_symbols = set(self.client.symbol_info.keys())
-        blacklist = set(config.BLACKLIST)
-
-        scored = []
-        for t in ticker_data:
-            sym = t.get("symbol", "")
-            if sym not in valid_symbols:
-                continue
-            if sym in blacklist:
-                continue
-            if not sym.endswith("USDT"):
-                continue
-            try:
-                vol = float(t.get("quoteVolume", 0))
-                scored.append((sym, vol))
-            except (ValueError, TypeError):
-                pass
-
-        scored.sort(key=lambda x: x[1], reverse=True)
-        symbols = [s for s, _ in scored[: config.TOP_SYMBOLS_COUNT]]
-        logger.info(f"Keşfedilen semboller: {', '.join(symbols)}")
-        return symbols
+        # Fallback
+        fallback = [s for s in DEFAULT_FALLBACK_SYMBOLS[: config.TOP_SYMBOLS_COUNT] if s not in config.BLACKLIST]
+        logger.info(f"Varsayılan semboller devrede: {', '.join(fallback)}")
+        return fallback
 
     # ── Geçmiş Veri Yükleme ───────────────────────────────────────────────────
 
@@ -215,7 +227,7 @@ class TradingBot:
         """Tek sembol için geçmiş veri yükle ve ML eğit."""
         try:
             klines = await self.client.get_klines(
-                symbol, config.PRIMARY_TF, limit=config.ML_HISTORY_CANDLES
+                symbol, config.PRIMARY_TF, limit=120
             )
             candles = [
                 {
@@ -234,15 +246,18 @@ class TradingBot:
             self.store.seed(symbol, candles)
             await self.ml_model.train_symbol(symbol, candles)
         except Exception as exc:
-            logger.warning(f"[{symbol}] Geçmiş veri yükleme hatası: {exc}")
+            logger.warning(f"[{symbol}] Geçmiş veri yükleme atlandı ({exc}), canlı akıştan toplanacak.")
 
     async def _seed_all_symbols(self) -> None:
         """Sembol geçmiş verilerini rate limit'e takılmadan sırayla yükle."""
         logger.info(f"Geçmiş veri yükleniyor ({len(self._symbols)} sembol)...")
         for s in self._symbols:
-            await self._seed_symbol(s)
-            await asyncio.sleep(0.25)  # Binance rate limit koruması
-        logger.info("Geçmiş veri başarıyla yüklendi")
+            try:
+                await self._seed_symbol(s)
+            except Exception:
+                pass
+            await asyncio.sleep(0.15)  # Binance rate limit koruması
+        logger.info("Geçmiş veri yükleme tamamlandı")
 
     # ── Kline İşleme ──────────────────────────────────────────────────────────
 
@@ -635,14 +650,14 @@ def get_bot() -> Optional[TradingBot]:
 async def run_bot() -> None:
     """Bot'u başlat ve çalıştır (Hata durumunda otomatik kendini toparlar)."""
     global _bot, _fatal_error
-    retry_delay = 20
+    retry_delay = 15
     while True:
         _bot = TradingBot()
         try:
             await _bot.start()
             while _bot._running:
                 await asyncio.sleep(1)
-            break
+            logger.warning(f"Bot çalışma döngüsü durdu (_running={_bot._running}). {retry_delay} saniye sonra yeniden başlatılıyor...")
         except KeyboardInterrupt:
             logger.info("Kullanıcı tarafından durduruldu")
             break
@@ -659,10 +674,10 @@ async def run_bot() -> None:
                 await _bot.stop()
             except Exception:
                 pass
-            await asyncio.sleep(retry_delay)
         finally:
             if _bot and not _bot._running:
                 try:
                     await _bot.stop()
                 except Exception:
                     pass
+        await asyncio.sleep(retry_delay)

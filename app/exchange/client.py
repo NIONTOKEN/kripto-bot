@@ -97,7 +97,7 @@ class BinanceClient:
         if params is None:
             params = {}
         req_params = None if signed else params
-        last_exc: Exception = RuntimeError("Unknown")
+        last_exc: Exception = RuntimeError("Binance API isteği başarısız oldu veya sunucu yanıt vermedi")
         for attempt in range(retries):
             # İmzalı isteklerde her denemede taze timestamp üret
             actual_url = url
@@ -123,12 +123,13 @@ class BinanceClient:
                             logger.warning(f"⏳ BINANCE RATE LIMIT: {ban_msg}")
                             import re
                             match = re.search(r"banned until (\d+)", ban_msg)
-                            wait_sec = 45
+                            wait_sec = 15
                             if match:
                                 ban_ts = int(match.group(1))
                                 current_ts = int(time.time() * 1000)
-                                wait_sec = max(5, min(180, (ban_ts - current_ts) // 1000 + 3))
-                            logger.info(f"Rate limit nedeniyle {wait_sec} saniye bekleniyor, ardından devam edilecek...")
+                                wait_sec = max(5, min(45, (ban_ts - current_ts) // 1000 + 1))
+                            last_exc = RuntimeError(f"Binance Rate Limit (-1003): {ban_msg}")
+                            logger.info(f"Rate limit nedeniyle {wait_sec} saniye bekleniyor...")
                             await asyncio.sleep(wait_sec)
                             continue
 
@@ -167,32 +168,68 @@ class BinanceClient:
 
     # ── Exchange Info ─────────────────────────────────────────────────────────
 
+    def _load_fallback_precisions(self) -> None:
+        """REST erişilemediğinde en popüler 20 parite için güvenli varsayılanlar."""
+        fallbacks = {
+            "BTCUSDT": (3, 1, Decimal("0.001"), Decimal("5.0")),
+            "ETHUSDT": (3, 2, Decimal("0.001"), Decimal("5.0")),
+            "SOLUSDT": (2, 2, Decimal("0.01"), Decimal("5.0")),
+            "BNBUSDT": (2, 2, Decimal("0.01"), Decimal("5.0")),
+            "XRPUSDT": (1, 4, Decimal("0.1"), Decimal("5.0")),
+            "DOGEUSDT": (0, 5, Decimal("1"), Decimal("5.0")),
+            "ADAUSDT": (0, 4, Decimal("1"), Decimal("5.0")),
+            "AVAXUSDT": (1, 2, Decimal("0.1"), Decimal("5.0")),
+            "LINKUSDT": (2, 3, Decimal("0.01"), Decimal("5.0")),
+            "SUIUSDT": (1, 4, Decimal("0.1"), Decimal("5.0")),
+            "NEARUSDT": (1, 3, Decimal("0.1"), Decimal("5.0")),
+            "APTUSDT": (1, 2, Decimal("0.1"), Decimal("5.0")),
+            "PEPEUSDT": (0, 7, Decimal("100"), Decimal("5.0")),
+            "SHIBUSDT": (0, 6, Decimal("1000"), Decimal("5.0")),
+            "DOTUSDT": (1, 3, Decimal("0.1"), Decimal("5.0")),
+            "LTCUSDT": (3, 2, Decimal("0.001"), Decimal("5.0")),
+            "ARBUSDT": (1, 4, Decimal("0.1"), Decimal("5.0")),
+            "OPUSDT": (1, 4, Decimal("0.1"), Decimal("5.0")),
+            "INJUSDT": (1, 3, Decimal("0.1"), Decimal("5.0")),
+            "FETUSDT": (0, 4, Decimal("1"), Decimal("5.0")),
+        }
+        for s, (qp, pp, mq, mn) in fallbacks.items():
+            self.symbol_info[s] = {"symbol": s, "status": "TRADING"}
+            self._qty_precisions[s] = qp
+            self._price_precisions[s] = pp
+            self._min_qtys[s] = mq
+            self._min_notionals[s] = mn
+        logger.info(f"Yedek exchange info: {len(self.symbol_info)} sembol aktif edildi")
+
     async def _load_exchange_info(self) -> None:
-        data = await self._request("GET", "/fapi/v1/exchangeInfo")
-        for sym in data["symbols"]:
-            if (
-                sym.get("contractType") == "PERPETUAL"
-                and sym.get("quoteAsset") == "USDT"
-                and sym.get("status") == "TRADING"
-            ):
-                s = sym["symbol"]
-                self.symbol_info[s] = sym
+        try:
+            data = await self._request("GET", "/fapi/v1/exchangeInfo")
+            for sym in data.get("symbols", []):
+                if (
+                    sym.get("contractType") == "PERPETUAL"
+                    and sym.get("quoteAsset") == "USDT"
+                    and sym.get("status") == "TRADING"
+                ):
+                    s = sym["symbol"]
+                    self.symbol_info[s] = sym
 
-                # LOT_SIZE
-                for f in sym.get("filters", []):
-                    if f["filterType"] == "LOT_SIZE":
-                        step = f["stepSize"].rstrip("0")
-                        if "." in step:
-                            self._qty_precisions[s] = len(step.split(".")[1])
-                        else:
-                            self._qty_precisions[s] = 0
-                        self._min_qtys[s] = Decimal(f["minQty"])
-                    elif f["filterType"] == "MIN_NOTIONAL":
-                        self._min_notionals[s] = Decimal(f.get("notional", "5"))
+                    # LOT_SIZE
+                    for f in sym.get("filters", []):
+                        if f["filterType"] == "LOT_SIZE":
+                            step = f["stepSize"].rstrip("0")
+                            if "." in step:
+                                self._qty_precisions[s] = len(step.split(".")[1])
+                            else:
+                                self._qty_precisions[s] = 0
+                            self._min_qtys[s] = Decimal(f["minQty"])
+                        elif f["filterType"] == "MIN_NOTIONAL":
+                            self._min_notionals[s] = Decimal(f.get("notional", "5"))
 
-                self._price_precisions[s] = sym.get("pricePrecision", 2)
+                    self._price_precisions[s] = sym.get("pricePrecision", 2)
 
-        logger.info(f"Exchange info: {len(self.symbol_info)} USDT perpetual sembol")
+            logger.info(f"Exchange info: {len(self.symbol_info)} USDT perpetual sembol yüklendi")
+        except Exception as exc:
+            logger.warning(f"Exchange info REST üzerinden alınamadı ({exc}), yedek sembol bilgileri atanıyor...")
+            self._load_fallback_precisions()
 
     async def reload_exchange_info(self) -> None:
         """Sembol bilgilerini yenile."""
