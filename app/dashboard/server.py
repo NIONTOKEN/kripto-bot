@@ -154,6 +154,12 @@ async def get_status() -> dict:
     }
 
 
+@app.get("/healthz")
+async def healthz() -> dict:
+    """Render health check — servisin canlı olduğunu doğrular."""
+    return {"status": "ok", "running": _bot_state["running"], "server_time": datetime.utcnow().isoformat()}
+
+
 @app.get("/api/positions")
 async def get_positions() -> List[dict]:
     trades = await get_open_trades()

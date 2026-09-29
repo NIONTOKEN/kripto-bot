@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 
+import aiohttp
 import uvicorn
 
 from app.bot import run_bot
@@ -18,6 +20,31 @@ from app.dashboard.server import app as fastapi_app
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+async def _self_ping_loop() -> None:
+    """
+    Render ücretsiz plan uyku modunu (15 dakika hareketsizlik) engeller.
+    Her 13 dakikada kendi /healthz endpointini çağırır.
+    """
+    # Servise biraz ısınma süresi ver
+    await asyncio.sleep(60)
+    service_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    if not service_url:
+        # RENDER_EXTERNAL_URL tanımlı değilse localhost dene
+        port = config.DASHBOARD_PORT
+        service_url = f"http://0.0.0.0:{port}"
+    ping_url = f"{service_url}/healthz"
+    logger.info(f"Self-ping döngüsü başlatıldı → {ping_url} (her 13 dakika)")
+    while True:
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.get(ping_url) as resp:
+                    if resp.status == 200:
+                        logger.debug("Self-ping başarılı ✓")
+        except Exception as exc:
+            logger.debug(f"Self-ping hatası (zararsız): {exc}")
+        await asyncio.sleep(780)  # 13 dakika
 
 
 async def main() -> None:
@@ -49,10 +76,11 @@ async def main() -> None:
 
     logger.info(f"Dashboard: http://{config.DASHBOARD_HOST}:{config.DASHBOARD_PORT}")
 
-    # ── Bot ve Dashboard paralel çalıştır ─────────────────────────────────────
+    # ── Bot, Dashboard ve Self-Ping paralel çalıştır ──────────────────────────
     await asyncio.gather(
         server.serve(),
         run_bot(),
+        _self_ping_loop(),
         return_exceptions=True,
     )
 

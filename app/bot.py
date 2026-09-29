@@ -80,8 +80,7 @@ class TradingBot:
         total_balance = Decimal("0")
         unrealized = Decimal("0")
 
-        while self._running or not hasattr(self, '_started_once'):
-            self._started_once = True
+        while True:  # Bakiye MIN_BALANCE_USDT'ye ulaşana kadar bekle
             try:
                 balance = await self.client.get_balance_usdt()
                 wallet_bal = await self.client.get_wallet_balance_usdt()
@@ -98,7 +97,7 @@ class TradingBot:
 
                 if total_balance >= config.MIN_BALANCE_USDT:
                     break  # Toplam bakiye yeterli, işleme ve pozisyon takibine geç
-                
+
                 logger.info(f"Bakiye bekleniyor (Toplam: {total_balance:.2f} < {config.MIN_BALANCE_USDT} USDT). 10sn sonra tekrar kontrol edilecek...")
                 await asyncio.sleep(10)
             except Exception as exc:
