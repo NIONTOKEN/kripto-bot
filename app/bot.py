@@ -80,6 +80,7 @@ class TradingBot:
         total_balance = Decimal("0")
         unrealized = Decimal("0")
 
+        balance_check_failures = 0
         while True:  # Bakiye MIN_BALANCE_USDT'ye ulaşana kadar bekle
             try:
                 balance = await self.client.get_balance_usdt()
@@ -92,6 +93,7 @@ class TradingBot:
                     wallet_balance=float(wallet_bal),
                     unrealized_pnl=float(unrealized),
                     testnet=config.BINANCE_TESTNET,
+                    error=None,
                 )
                 logger.info(f"Kullanılabilir bakiye: {balance:.4f} USDT | Toplam: {total_balance:.4f} USDT")
 
@@ -101,7 +103,15 @@ class TradingBot:
                 logger.info(f"Bakiye bekleniyor (Toplam: {total_balance:.2f} < {config.MIN_BALANCE_USDT} USDT). 10sn sonra tekrar kontrol edilecek...")
                 await asyncio.sleep(10)
             except Exception as exc:
-                logger.warning(f"Bakiye kontrol hatası: {exc}. 10sn sonra tekrar denenecek...")
+                balance_check_failures += 1
+                err_msg = f"Binance Bakiye Kontrol Hatası: {exc}"
+                logger.warning(f"{err_msg}. 10sn sonra tekrar denenecek...")
+                update_bot_state(error=err_msg, running=False)
+                if balance_check_failures % 6 == 1 and self.notifier:
+                    try:
+                        await self.notifier.error_alert(f"⚠️ {err_msg}")
+                    except Exception:
+                        pass
                 await asyncio.sleep(10)
 
         # ── 4. Sembolleri keşfet / varsayılanları ata ─────────────────────────

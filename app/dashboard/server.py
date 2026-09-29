@@ -137,6 +137,25 @@ async def get_sw():
     )
 
 
+_cached_outbound_ip: Optional[str] = None
+
+
+async def _get_outbound_ip() -> str:
+    global _cached_outbound_ip
+    if _cached_outbound_ip:
+        return _cached_outbound_ip
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
+            async with session.get("https://api.ipify.org") as resp:
+                if resp.status == 200:
+                    _cached_outbound_ip = (await resp.text()).strip()
+                    return _cached_outbound_ip
+    except Exception:
+        pass
+    return "unknown"
+
+
 @app.get("/api/status")
 async def get_status() -> dict:
     return {
@@ -150,6 +169,7 @@ async def get_status() -> dict:
         "daily_pnl": _bot_state["daily_pnl"],
         "uptime_start": _bot_state["uptime_start"],
         "error": _bot_state.get("error", None),
+        "outbound_ip": await _get_outbound_ip(),
         "server_time": datetime.utcnow().isoformat(),
     }
 
@@ -157,7 +177,12 @@ async def get_status() -> dict:
 @app.get("/healthz")
 async def healthz() -> dict:
     """Render health check — servisin canlı olduğunu doğrular."""
-    return {"status": "ok", "running": _bot_state["running"], "server_time": datetime.utcnow().isoformat()}
+    return {
+        "status": "ok",
+        "running": _bot_state["running"],
+        "outbound_ip": await _get_outbound_ip(),
+        "server_time": datetime.utcnow().isoformat(),
+    }
 
 
 @app.get("/api/positions")
