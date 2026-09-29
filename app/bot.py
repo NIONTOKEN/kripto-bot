@@ -165,11 +165,14 @@ class TradingBot:
         await self.ws_manager.start()
 
         # ── 10. User data stream ──────────────────────────────────────────────
-        self.user_stream = UserDataStream(
-            self.client,
-            on_order_update=self.order_manager.on_order_filled,
-        )
-        await self.user_stream.start()
+        try:
+            self.user_stream = UserDataStream(
+                self.client,
+                on_order_update=self.order_manager.on_order_filled,
+            )
+            await self.user_stream.start()
+        except Exception as exc:
+            logger.warning(f"UserDataStream başlatma uyarısı: {exc}")
 
         self._running = True
         logger.info(f"Bot tam aktif — {len(self._symbols)} sembol canlı akışta dinleniyor")
