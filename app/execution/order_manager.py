@@ -471,6 +471,7 @@ class OrderManager:
         Binance'deki gerçek pozisyonları DB ile senkronize et.
         Bot yeniden başlatıldığında veya periyodik olarak çağrılır.
         """
+        from app.dashboard.server import update_bot_state
         try:
             open_trades = await get_open_trades()
             open_symbols = {t.symbol: t for t in open_trades}
@@ -490,6 +491,7 @@ class OrderManager:
                     )
 
             # Binance'de olup veritabanında olmayan pozisyonları veritabanına aktar
+            synced_count = 0
             for sym, pos in binance_positions.items():
                 if sym not in open_symbols:
                     pos_amt = Decimal(pos.get("positionAmt", "0"))
@@ -520,8 +522,15 @@ class OrderManager:
                     )
                     await save_trade(new_trade)
                     self._trail_highs[sym] = mark_p
+                    synced_count += 1
                     logger.info(
                         f"[{sym}] Binance'deki açık pozisyon DB'ye senkronize edildi: {side} {qty} @ {entry_p}"
                     )
+
+            # Dashboard'u gerçek pozisyon sayısıyla güncelle
+            final_open = await get_open_trades()
+            update_bot_state(open_positions=len(final_open))
+            if synced_count > 0:
+                logger.info(f"Sync tamamlandı: {synced_count} yeni pozisyon DB'ye aktarıldı. Toplam açık: {len(final_open)}")
         except Exception as exc:
             logger.error(f"Pozisyon senkronizasyon hatası: {exc}")

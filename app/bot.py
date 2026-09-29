@@ -376,11 +376,11 @@ class TradingBot:
             logger.debug(f"[{symbol}] Order book alınamadı: {exc}")
 
         # ── 4.8. Çoklu Zaman Dilimi (1H + 4H) Makro Trend Analizi ──────────
-        # 10 dakikalık hafıza önbelleği (API kotasını korur ve tarama hızını artırır)
+        # 30 dakikalık önbellek (API kotasını koru - sadece cache miss'te istek at)
         import time
         now_ts = time.time()
         cached_htf = self._htf_cache.get(symbol)
-        if cached_htf and (now_ts - cached_htf[0] < 600):
+        if cached_htf and (now_ts - cached_htf[0] < 1800):  # 30 dakika TTL
             trend_1h, trend_4h = cached_htf[1], cached_htf[2]
         else:
             trend_1h = "NEUTRAL"
@@ -412,7 +412,9 @@ class TradingBot:
                         trend_4h = "BEARISH"
 
                 self._htf_cache[symbol] = (now_ts, trend_1h, trend_4h)
+                await asyncio.sleep(0.15)  # Semboller arası rate limit koruması
             except Exception as htf_err:
+                # Hata varsa mevcut cache'i koru, varsayılan NEUTRAL kullan
                 logger.debug(f"[{symbol}] HTF (1H/4H) analiz hatası: {htf_err}")
 
         # ── 5. Sinyal skoru (AlphaPulse 10-Faktör + Tahta + Trend + HTF Hibrit) ─
@@ -622,15 +624,16 @@ class TradingBot:
             if status_counter >= status_update_interval:
                 status_counter = 0
                 try:
-                    wallet_balance = await self.client.get_wallet_balance_usdt()
-                    total_balance = await self.client.get_total_balance_usdt()
+                    available_balance = await self.client.get_balance_usdt()   # serbest bakiye
+                    wallet_balance = await self.client.get_wallet_balance_usdt()  # cüzdan bakiyesi
+                    total_balance = await self.client.get_total_balance_usdt()    # toplam (margin dahil)
                     unrealized = total_balance - wallet_balance
                     open_count = len(await get_open_trades())
                     daily_pnl = float(await self._get_daily_pnl())
                     update_bot_state(
                         running=True,
-                        balance=float(total_balance),
-                        wallet_balance=float(wallet_balance),
+                        balance=float(available_balance),    # serbest (kullanılabilir)
+                        wallet_balance=float(wallet_balance),  # cüzdan (yatırılan toplam)
                         unrealized_pnl=float(unrealized),
                         open_positions=open_count,
                         daily_pnl=daily_pnl,
