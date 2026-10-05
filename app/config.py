@@ -43,28 +43,28 @@ class Config:
     )
 
     # ─── Trading ─────────────────────────────────────────────────────────────
-    LEVERAGE: int = int(_opt("LEVERAGE", "15"))
-    MAX_OPEN_POSITIONS: int = int(_opt("MAX_OPEN_POSITIONS", "4"))
-    RISK_PER_TRADE_PCT: Decimal = Decimal(_opt("RISK_PER_TRADE_PCT", "28.0"))
-    MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "42.0"))
-    MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "0.2"))
+    LEVERAGE: int = int(_opt("LEVERAGE", "10"))
+    MAX_OPEN_POSITIONS: int = int(_opt("MAX_OPEN_POSITIONS", "2"))
+    RISK_PER_TRADE_PCT: Decimal = Decimal(_opt("RISK_PER_TRADE_PCT", "20.0"))
+    MIN_SCORE_TO_OPEN: float = float(_opt("MIN_SCORE_TO_OPEN", "58.0"))
+    MIN_BALANCE_USDT: Decimal = Decimal(_opt("MIN_BALANCE_USDT", "5.0"))
     MAX_LEVERAGE: int = int(_opt("MAX_LEVERAGE", "25"))
     ONLY_LONG: bool = _opt("ONLY_LONG", "false").lower() == "true"
     SCALP_MODE: bool = _opt("SCALP_MODE", "true").lower() == "true"
-    SCALP_LEVERAGE: int = int(_opt("SCALP_LEVERAGE", "15"))
+    SCALP_LEVERAGE: int = int(_opt("SCALP_LEVERAGE", "10"))
     SWING_LEVERAGE: int = int(_opt("SWING_LEVERAGE", "8"))
 
     # ─── Risk ────────────────────────────────────────────────────────────────
-    DAILY_LOSS_LIMIT_PCT: Decimal = Decimal(_opt("DAILY_LOSS_LIMIT_PCT", "50.0"))
-    SL_ATR_MULTIPLIER: Decimal = Decimal(_opt("SL_ATR_MULTIPLIER", "1.5"))
-    TP_ATR_MULTIPLIER: Decimal = Decimal(_opt("TP_ATR_MULTIPLIER", "3.0"))
+    DAILY_LOSS_LIMIT_PCT: Decimal = Decimal(_opt("DAILY_LOSS_LIMIT_PCT", "8.0"))
+    SL_ATR_MULTIPLIER: Decimal = Decimal(_opt("SL_ATR_MULTIPLIER", "2.0"))
+    TP_ATR_MULTIPLIER: Decimal = Decimal(_opt("TP_ATR_MULTIPLIER", "4.5"))
     TRAILING_STOP: bool = _opt("TRAILING_STOP", "true").lower() == "true"
 
     # ─── Semboller ───────────────────────────────────────────────────────────
     TOP_SYMBOLS_COUNT: int = int(_opt("TOP_SYMBOLS_COUNT", "20"))
     BLACKLIST: List[str] = [
         s.strip().upper()
-        for s in _opt("BLACKLIST", "").split(",")
+        for s in _opt("BLACKLIST", "MUBARAKUSDT,BELUSDT").split(",")
         if s.strip()
     ]
 
