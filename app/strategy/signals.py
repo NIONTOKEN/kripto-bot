@@ -146,22 +146,22 @@ def calculate_signal(
         trend_4h=trend_4h,
     )
 
-    # ⚡ E) SCALP_LONG (Hızlı Vur-Kaç Long - Anlık Alıcı Baskısı & Tahta Dengesizliği):
+    # ⚡ E) SCALP_LONG (Hızlı Vur-Kaç Long — Güçlü alıcı baskısı gerekli):
     allow_scalp_long = (
         config.SCALP_MODE and
-        (ob is not None and ob.imbalance >= 0.18) and
-        (total > 0.18 or alpha_res.alpha_score >= 62.0) and
+        (ob is not None and ob.imbalance >= 0.28) and   # eskisi 0.18, daha sert filtre
+        (total > 0.28 or alpha_res.alpha_score >= 68.0) and  # eskisi 0.18/62
         (not (ob and ob.has_ask_wall)) and
-        (ind.rsi < 75)
+        (ind.rsi > 40 and ind.rsi < 68)  # aşırı alım/satım bölgelerinde scalp yasak
     )
 
-    # ⚡ F) SCALP_SHORT (Hızlı Vur-Kaç Short - Anlık Satıcı Baskısı & Tahta Dengesizliği):
+    # ⚡ F) SCALP_SHORT (Hızlı Vur-Kaç Short — Güçlü satıcı baskısı gerekli):
     allow_scalp_short = (
         config.SCALP_MODE and
-        (ob is not None and ob.imbalance <= -0.18) and
-        (total < -0.18 or alpha_res.alpha_score <= 38.0) and
+        (ob is not None and ob.imbalance <= -0.28) and  # eskisi -0.18, daha sert filtre
+        (total < -0.28 or alpha_res.alpha_score <= 32.0) and  # eskisi -0.18/38
         (not (ob and ob.has_bid_wall)) and
-        (ind.rsi > 25)
+        (ind.rsi > 32 and ind.rsi < 60)  # aşırı alım/satım bölgelerinde scalp yasak
     )
 
     # Karar Motoru Öncelik Sıralaması:

@@ -115,16 +115,17 @@ class RiskManager:
 
             # ── 1. OTOMATİK BİLEŞİK BÜYÜME MARJİN BELİRLEME ───────────────────
             # Cüzdan bakiyesine göre kademeli pozisyon marjini
+            risk_pct = config.RISK_PER_TRADE_PCT / Decimal("100")  # .env'den oku
             if balance < Decimal("1.5"):
                 margin_pct = Decimal("0.95")  # Mikro bakiyede neredeyse tüm kasayı tek işleme bağla
-            elif balance < Decimal("25"):
-                margin_pct = Decimal("0.25")
+            elif balance < Decimal("10"):
+                margin_pct = Decimal("0.30")
             elif balance < Decimal("100"):
-                margin_pct = Decimal("0.22")
+                margin_pct = risk_pct  # .env'deki RISK_PER_TRADE_PCT = %20
             elif balance < Decimal("1000"):
-                margin_pct = Decimal("0.20")
+                margin_pct = min(risk_pct, Decimal("0.18"))
             else:
-                margin_pct = Decimal("0.15")
+                margin_pct = min(risk_pct, Decimal("0.12"))
 
             target_margin = balance * margin_pct
 
