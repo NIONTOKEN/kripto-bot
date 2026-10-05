@@ -323,8 +323,9 @@ class OrderManager:
                     self._trail_highs[symbol] = mark_price
 
                 # ── 0. EMİR DEFTERİ TERS BASKI ÇIKIŞI (VUR-KAÇ HIZLI KÂR AL) ───
-                # Pozisyon kârdaysa (+%0.70 üzeri) ve karşı tarafta ani satış/alış duvarı veya ters baskı gelirse kârı cebe koyup hemen çık!
-                if profit_pct >= Decimal("0.70") and not is_macro:
+                # Pozisyon kârdaysa (+%2.0 üzeri) ve karşı tarafta güçlü ters duvar varsa kârı koru
+                # (Eskisi %0.70 idi — çok erken kapanıyordu! Şimdi %2.0)
+                if profit_pct >= Decimal("2.0") and not is_macro:
                     try:
                         depth = await self._client.get_order_book(symbol, limit=20)
                         from app.strategy.orderbook import analyze_order_book
@@ -332,10 +333,10 @@ class OrderManager:
 
                         should_quick_tp = False
                         wall_info = ""
-                        if direction == "LONG" and (ob.imbalance <= -0.30 or ob.has_ask_wall):
+                        if direction == "LONG" and (ob.imbalance <= -0.40 or ob.has_ask_wall):
                             should_quick_tp = True
                             wall_info = f"Satış duvarı={ob.ask_wall_price}" if ob.has_ask_wall else f"Satıcı Dengesizliği={ob.imbalance:.2f}"
-                        elif direction == "SHORT" and (ob.imbalance >= 0.30 or ob.has_bid_wall):
+                        elif direction == "SHORT" and (ob.imbalance >= 0.40 or ob.has_bid_wall):
                             should_quick_tp = True
                             wall_info = f"Alış duvarı={ob.bid_wall_price}" if ob.has_bid_wall else f"Alıcı Dengesizliği={ob.imbalance:.2f}"
 
@@ -350,11 +351,12 @@ class OrderManager:
                     except Exception as ob_exc:
                         logger.debug(f"[{symbol}] Derinlik analiz hatası: {ob_exc}")
 
-                # ── 1. KADEME 1: BREAK-EVEN KİLİTLEME (+%0.55 KÂRDA SIFIR RİSK) ─
-                be_thresh = Decimal("2.5") if is_macro else Decimal("0.55")
+                # ── 1. KADEME 1: BREAK-EVEN KİLİTLEME (+%1.5 KÂRDA SIFIR RİSK) ─
+                # Eskisi %0.55 idi — çok erken kilitleme, trend ölüyordu! Şimdi %1.5
+                be_thresh = Decimal("2.5") if is_macro else Decimal("1.5")
                 if profit_pct >= be_thresh:
                     if direction == "LONG":
-                        lock_mult = Decimal("1.008") if is_macro else Decimal("1.001")
+                        lock_mult = Decimal("1.008") if is_macro else Decimal("1.002")
                         target_be = self._client.round_price(symbol, entry_p * lock_mult)
                         if trade.sl_price < target_be:
                             tag = f"MAKRO {sig_type}" if is_macro else "⚡ VUR-KAÇ"
@@ -363,7 +365,7 @@ class OrderManager:
                             )
                             await self._update_sl(trade, target_be)
                     else:  # SHORT
-                        lock_mult = Decimal("0.992") if is_macro else Decimal("0.999")
+                        lock_mult = Decimal("0.992") if is_macro else Decimal("0.998")
                         target_be = self._client.round_price(symbol, entry_p * lock_mult)
                         if trade.sl_price > target_be:
                             tag = f"MAKRO {sig_type}" if is_macro else "⚡ VUR-KAÇ"
@@ -372,26 +374,29 @@ class OrderManager:
                             )
                             await self._update_sl(trade, target_be)
 
-                # ── 2. KADEME 2: ASGARİ KÂR KİLİTLEME (+%1.00 KÂRDA ASGARİ %0.50 CEPTE)
-                lock_thresh = Decimal("1.00")
+                # ── 2. KADEME 2: ASGARİ KÂR KİLİTLEME (+%2.5 KÂRDA ASGARİ %1.0 CEPTE)
+                # Eskisi %1.0'da başlıyordu — çok erken sıkıştırıyordu! Şimdi %2.5
+                lock_thresh = Decimal("2.5")
                 if profit_pct >= lock_thresh and not is_macro:
                     if direction == "LONG":
-                        target_lock = self._client.round_price(symbol, entry_p * Decimal("1.005"))
+                        target_lock = self._client.round_price(symbol, entry_p * Decimal("1.010"))
                         if trade.sl_price < target_lock:
                             logger.info(
-                                f"[{symbol}] 🔒 ASGARİ KÂR KİLİTLENDİ (+%{profit_pct:.2f}) -> SL={target_lock} (+%0.50 kâr garanti)"
+                                f"[{symbol}] 🔒 ASGARİ KÂR KİLİTLENDİ (+%{profit_pct:.2f}) -> SL={target_lock} (+%1.0 kâr garanti)"
                             )
                             await self._update_sl(trade, target_lock)
                     else:  # SHORT
-                        target_lock = self._client.round_price(symbol, entry_p * Decimal("0.995"))
+                        target_lock = self._client.round_price(symbol, entry_p * Decimal("0.990"))
                         if trade.sl_price > target_lock:
                             logger.info(
-                                f"[{symbol}] 🔒 ASGARİ KÂR KİLİTLENDİ (+%{profit_pct:.2f}) -> SL={target_lock} (+%0.50 kâr garanti)"
+                                f"[{symbol}] 🔒 ASGARİ KÂR KİLİTLENDİ (+%{profit_pct:.2f}) -> SL={target_lock} (+%1.0 kâr garanti)"
                             )
                             await self._update_sl(trade, target_lock)
 
                 # ── 3. KADEME 3: DİNAMİK YAKIN İZ SÜREN STOP (TRAILING STOP) ────
-                trail_thresh = Decimal("4.0") if is_macro else Decimal("1.35")
+                # Eskisi %1.35'te başlıyordu ve %0.6 ile izliyordu — çok sıkı!
+                # Şimdi %3.0'da başlıyor ve %1.2 ile izliyor → trend ölene kadar sürülsün!
+                trail_thresh = Decimal("4.0") if is_macro else Decimal("3.0")
                 if profit_pct >= trail_thresh:
                     best = self._trail_highs.get(symbol, mark_price)
 
@@ -400,13 +405,14 @@ class OrderManager:
                             self._trail_highs[symbol] = mark_price
                         effective_high = max(best, mark_price)
 
-                        # Scalp için zirveden sadece %0.4 geriden izle! Kârın erimesine ASLA izin verme
+                        # Scalp: zirveden %0.8 geriden izle (eskisi %0.4 — çok sıkıydı)
+                        # Normal: zirveden %1.2 geriden izle (eskisi %0.6 — çok sıkıydı)
                         if is_scalp:
-                            trail_dist = effective_high * Decimal("0.004")
+                            trail_dist = effective_high * Decimal("0.008")
                         elif is_macro:
                             trail_dist = effective_high * Decimal("0.035")
                         else:
-                            trail_dist = effective_high * Decimal("0.006")
+                            trail_dist = effective_high * Decimal("0.012")
 
                         new_sl = self._client.round_price(symbol, effective_high - trail_dist)
                         if new_sl > trade.sl_price:
@@ -420,13 +426,12 @@ class OrderManager:
                             self._trail_highs[symbol] = mark_price
                         effective_low = min(best, mark_price)
 
-                        # Scalp için dipten sadece %0.4 geriden izle!
                         if is_scalp:
-                            trail_dist = effective_low * Decimal("0.004")
+                            trail_dist = effective_low * Decimal("0.008")
                         elif is_macro:
                             trail_dist = effective_low * Decimal("0.035")
                         else:
-                            trail_dist = effective_low * Decimal("0.006")
+                            trail_dist = effective_low * Decimal("0.012")
 
                         new_sl = self._client.round_price(symbol, effective_low + trail_dist)
                         if new_sl < trade.sl_price:
